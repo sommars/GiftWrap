@@ -53,7 +53,22 @@ independent.
 #-------------------------------------------------------------------------------
 def GetUCT(Pts):
 #Stack points vertically
-	return (matrix(Pts).transpose()).echelon_form(include_zero_rows = True, transformation = True)[1]
+	return (((matrix(matrix(Pts),ZZ).transpose()).echelon_form(include_zero_rows = True, transformation = True)[1])^-1).transpose()
+
+#-------------------------------------------------------------------------------
+def GetUCTAndNormal(Vector):
+	def ConvertMatrixToList(Matrix):
+		Pts = []
+		for Row in Matrix.transpose():
+			Pts.append(list(Row))
+		return Pts
+#Stack points vertically
+	HNF, UCT = (matrix(matrix(Vector),ZZ).transpose()).echelon_form(include_zero_rows = True, transformation = True)
+	#We need to check to make sure we're getting the right
+	UCT = ((UCT)^-1)
+	if ConvertMatrixToList(UCT)[0] != Vector:
+		return "AAASDFASFDASDFKASDF"
+	return UCT.transpose(), ConvertMatrixToList(HNF)
 
 #-------------------------------------------------------------------------------
 def GetHNF(Pts):

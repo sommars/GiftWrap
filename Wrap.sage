@@ -41,12 +41,14 @@ def GiftWrap(Pts):
 		# I may have found one or more additional pts on the hyperplane. I don't know
 		# that I've found all of them. Do a UCT on the FacetPts, see what else is in
 		# the hyperplane
-		UCT = GetUCT(FacetPts)
+		UCT, Normal = GetUCTAndNormal(GetNormalFromHNF(GetHNF(FacetPts)))
 		NewPts = TransformPts(Pts, UCT)
 		NewFacetPts = TransformPts(FacetPts, UCT)
 		for Pt in NewPts:
-			if (Pt[0] == 1) and (Pt not in NewFacetPts):
+			if (Pt[0] == NewFacetPts[0][0]) and (Pt not in NewFacetPts):
 				NewFacetPts.append(Pt)
+		#Need to put the facetpts back into their original dimension
+		FacetPts = TransformPts(FacetPts, matrix(UCT^-1,ZZ))
 		#Call MakeFacet on the points I've found and do some bookkeeping
 		Facet, PtsToRemove, Edges = MakeFacet(FacetPts)
 		Pts = RemovePts(Pts, PtsToRemove)

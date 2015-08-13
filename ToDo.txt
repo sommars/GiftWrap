@@ -1,3 +1,5 @@
 -How do I find a normal to a facet? It won't be an nx(n+1) matrix
+ANSWER: Deal with vectors instead of points.
 -Currently, I'm keeping the vertices, not references to the vertices. This needs to be improved
 -Refer to Jan's thesis page 85. I need to do UCT*v, not UCT*(list of points). The W's on the bottom of page 84 may be HNF.
+ANSWER: Done.

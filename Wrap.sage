@@ -12,36 +12,54 @@ def GiftWrap(Pts):
 	# EdgeList should really be done via sets.
 	while len(EdgeList) > 0:
 		Edge = EdgeList[0]
+
 		#Find Facet that has this Edge
 		for Facet in Facets:
 			Vertices = Facet.Vertices
 			if (Edge[0] in Vertices) and (Edge[1] in Vertices):
 				break
-		#Do a UCT on the normal to this edge
+
+		# Find a UCT for the normal to this edge
 		UCT, Normal = GetUCTAndNormal(GetNormalFromHNF(GetHNF(Edge)))
 		NewEdge = TransformPts(Edge,UCT)
-		#Do the same UCT on the pointset
+		# Do the same UCT on the pointset
 		NewPts = TransformPts(Pts, UCT)
+
+		# We check which way the normal should be pointed, positive or negative.
+		# Note that I'm using outer normals. Another way of dealing with this would
+		# be using the barycenter.
+		Normal = Normal[0]
+		print Pts
+		print Edge
+		print NewPts
+		print NewEdge
+		print UCT
+		print Normal
+		print Edge
+		if not NormalShouldBePositive(NewPts, NewEdge):
+			Normal[0] = -1
+
 		#Get the additional points on this facet (Facet points will be the edge plus whatever we find in the GetMaximalPts)
-		MaximalPts, MinimalPts = GetMaxAndMinPts(NewPts, NewEdge, Normal)
-		# We have both maximal and minimal points. One direction is the way we want
+		MaximalPt, MinimalPt = GetMaxAndMinPt(NewPts, NewEdge, Normal)
+
+		# We have both a maximal and a minimal point. One direction is the way we want
 		# to rotate, the other will give us the facet that had that edge previously.
 		# We check which points we want here.
 		ExistingFacetVertices = TransformPts(Vertices, UCT)
-		UseMaximalPts = False
-		for Pt in MaximalPts:
-			if Pt in ExistingFacetVertices:
-				UseMaximalPts = True
-		if UseMaximalPts == True:
-			AdditionalPts = MaximalPts
+		UseMaximalPt = False
+		if MaximalPt in ExistingFacetVertices:
+				UseMaximalPt = True
+		if UseMaximalPt == True:
+			AdditionalPt = MaximalPt
 		else:
-			AdditionalPts = MinimalPts
+			AdditionalPt = MinimalPt
 
-		FacetPts = Edge + TransformPts(AdditionalPts, matrix(UCT^-1,ZZ))
+		FacetPts = Edge + TransformPts(AdditionalPt, matrix(UCT^-1,ZZ))
 		# I may have found one or more additional pts on the hyperplane. I don't know
 		# that I've found all of them. Do a UCT on the FacetPts, see what else is in
 		# the hyperplane
-		UCT, Normal = GetUCTAndNormal(GetNormalFromHNF(GetHNF(FacetPts)))
+		UCT = GetUCTAndNormal(GetNormalFromHNF(GetHNF(FacetPts)))[0]
+
 		NewPts = TransformPts(Pts, UCT)
 		NewFacetPts = TransformPts(FacetPts, UCT)
 		for Pt in NewPts:
@@ -169,7 +187,7 @@ for Test in Tests:
 	print Test[1]
 	print Pts
 	#GiftWrap(Pts)
-	print FindInitialFacet(Pts)
+	print GiftWrap(Pts)
 	print "Done with " + Test[1]
 	"""
 	print "Number of Vertices"

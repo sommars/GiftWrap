@@ -113,7 +113,7 @@ def FindInitialFacet(Pts):
 		
 		# Finally, we do another unimodular coordinate transform to find whatever 
 		# other points lie on our facet that we haven't yet found.
-		UCT = GetUCT(FirstPts)
+		UCT = GetUCTAndNormal(GetNormalFromHNF(GetHNF(FirstPts)))[0]
 		NewFirstPts = TransformPts(FirstPts, UCT)
 		NewPts = TransformPts(Pts, UCT)
 		VerticalPlaneCoord = NewFirstPts[0][0]
@@ -128,7 +128,14 @@ def FindInitialFacet(Pts):
 
 #-------------------------------------------------------------------------------
 def MakeFacet(Pts):
-	Hull, PointsToRemove = ConvexHull2d(Pts)
+	# We have all of the points in their general position. We need to bring them
+	# into vertical position so that the convexhull algorithm can work.
+	UCT = GetUCTAndNormal(GetNormalFromHNF(GetHNF(Pts)))[0]
+	NewPts = TransformPts(Pts, UCT)
+	Hull, PointsToRemove = ConvexHull2d(NewPts)
+
+	Hull = TransformPts(Hull, matrix(UCT^-1, ZZ))
+	PointsToRemove = TransformPts(PointsToRemove, matrix(UCT^-1, ZZ))
 	Facet = Face()
 #	Facet.Normal = 
 	Facet.Vertices = Hull
@@ -162,7 +169,7 @@ for Test in Tests:
 	print Test[1]
 	print Pts
 	#GiftWrap(Pts)
-	FindInitialFacet(Pts)
+	print FindInitialFacet(Pts)
 	print "Done with " + Test[1]
 	"""
 	print "Number of Vertices"

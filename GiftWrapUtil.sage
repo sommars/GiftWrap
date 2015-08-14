@@ -165,17 +165,15 @@ def NormalShouldBePositive(Pts, FacetPts):
 	return NormalShouldBePositive
 
 #-------------------------------------------------------------------------------
-def GetMaxAndMinPts(Pts, FacetPts, Normal):
-	MaximalPts = []
-	MinimalPts = []
+def GetMaxAndMinPt(Pts, FacetPts, Normal):
 	# We need some value to start with for the thetas, so pick the first valid option
 	for i in xrange(len(Pts)):
 		Pt = Pts[i]
 		if (Pt not in FacetPts and not PtIsZero(Pt)):
 			MaxTheta = FindCosTheta(Pt, Normal)
 			MinTheta = MaxTheta
-			MaximalPts.append(Pt)
-			MinimalPts.append(Pt)
+			MaximalPt = Pt
+			MinimalPt = Pt
 			break
 	print Pt, i, MaxTheta
 	# We don't need to go through all values, since we've already gone through some
@@ -183,17 +181,13 @@ def GetMaxAndMinPts(Pts, FacetPts, Normal):
 		Pt = Pts[j]
 		if (Pt not in FacetPts and not PtIsZero(Pt)):
 			TestTheta = FindCosTheta(Pt, Normal)
-			if TestTheta == MaxTheta:
-				MaximalPts.append(Pt)
-			if TestTheta == MinTheta:
-				MinimalPts.append(Pt)
 			if TestTheta > MaxTheta:
-				MaximalPts = [Pt]
+				MaximalPt = Pt
 				MaxTheta = TestTheta
 			if TestTheta < MinTheta:
-				MinimalPts = [Pt]
+				MinimalPt = Pt
 				MinTheta = TestTheta
-	return MaximalPts, MinimalPts
+	return MaximalPt, MinimalPt
 
 #-------------------------------------------------------------------------------
 def PtIsZero(Pt):
@@ -209,6 +203,8 @@ def TransformPts(Pts, UCT):
 		for Row in Matrix.transpose():
 			Pts.append(list(Row))
 		return Pts
+	if len(Pts) < 1:
+		return []
 	TransformMatrix = UCT*(matrix(Pts).transpose())
 	return ConvertMatrixToList(TransformMatrix)
 

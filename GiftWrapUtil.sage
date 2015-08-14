@@ -72,13 +72,22 @@ def GetUCTAndNormal(Vector):
 
 #-------------------------------------------------------------------------------
 def GetHNF(Pts):
-#Stack points horizontally
+	# Instead of thinking about these as points, we should think about these as
+	# being vectors.
 	def ConvertMatrixToList(Matrix):
 		Pts = []
 		for Row in Matrix:
 			Pts.append(list(Row))
 		return Pts
-	HNFMatrix = (matrix(Pts)).echelon_form(include_zero_rows = False)
+	if len(Pts) < 2:
+		return "Insufficient points for a Hermite Normal Form"
+
+	Vectors = []
+	Pt = Pts[0]
+	for i in xrange(1,len(Pts)):
+		Vectors.append([Pt[j] - Pts[i][j] for j in xrange(len(Pt))])
+
+	HNFMatrix = (matrix(Vectors)).echelon_form(include_zero_rows = False)
 	return ConvertMatrixToList(HNFMatrix)
 
 #-------------------------------------------------------------------------------
@@ -109,14 +118,13 @@ def FindCosTheta(U,V):
 	return float(DotProduct(U,V))/float((NormVector(U)*NormVector(V)))
 
 #-------------------------------------------------------------------------------
-def GetMaximalPts(Pts, FacetPts, Normal):
-	MaximalPts = []
+def GetAMaximalPt(Pts, FacetPts, Normal):
 	# We need some value to start with for theta, so pick the first valid option
 	for i in xrange(len(Pts)):
 		Pt = Pts[i]
 		if (Pt not in FacetPts and not PtIsZero(Pt)):
 			Theta = FindCosTheta(Pt, Normal)
-			MaximalPts.append(Pt)
+			MaximalPt = Pt
 			break
 
 	# We don't need to go through all values, since we've already gone through some
@@ -124,12 +132,37 @@ def GetMaximalPts(Pts, FacetPts, Normal):
 		Pt = Pts[j]
 		if (Pt not in FacetPts and not PtIsZero(Pt)):
 			TestTheta = FindCosTheta(Pt, Normal)
-			if TestTheta == Theta:
-				MaximalPts.append(Pt)
-			elif TestTheta > Theta:
-				MaximalPts = [Pt]
+			if TestTheta > Theta:
+				MaximalPt = Pt
 				Theta = TestTheta
-	return MaximalPts
+	return MaximalPt
+
+#-------------------------------------------------------------------------------
+def NormalShouldBePositive(Pts, FacetPts):
+	FacetVertValue = FacetPts[0][0]
+	for i in xrange(1,len(FacetPts)):
+		if FacetVertValue != FacetPts[i][0]:
+			print "All of the facetpts aren't on the same hyperplane"
+			raw_input()
+			return "All of the facetpts aren't on the same hyperplane"
+	# Sentinel value so that we know the value hasn't been set
+	NormalShouldBePositive = -1
+	for i in xrange(len(Pts)):
+		if FacetVertValue > Pts[i][0]:
+			if NormalShouldBePositive == -1:
+				NormalShouldBePositive = True
+			elif NormalShouldBePositive == False:
+				print "All of the points aren't to the same side of the hyperplane"
+				raw_input()
+				return "All of the points aren't to the same side of the hyperplane"
+		elif FacetVertValue < Pts[i][0]:
+			if NormalShouldBePositive == -1:
+				NormalShouldBePositive = False
+			elif NormalShouldBePositive == True:	
+				print "All of the points aren't to the same side of the hyperplane"
+				raw_input()
+				return "All of the points aren't to the same side of the hyperplane"
+	return NormalShouldBePositive
 
 #-------------------------------------------------------------------------------
 def GetMaxAndMinPts(Pts, FacetPts, Normal):

@@ -76,43 +76,53 @@ def FindInitialFacet(Pts):
 				FirstPtValue = Pt[0]
 		return FirstPts
 	FirstPts = FindFirstPts(Pts)
-	print FirstPts
 	Counter = 0
 	while True:
 		Counter += 1
-		HNF = GetHNF(FirstPts)
-		if CheckNormalFormDim(HNF) == 2:
-			break
-		Normal = GetNormalFromHNF(HNF)
+		print "FirstPts", FirstPts
+		if len(FirstPts) != 1:	
+			HNF = GetHNF(FirstPts)
+			if CheckNormalFormDim(HNF) == 1:
+				break
+			Normal = GetNormalFromHNF(HNF)
+
 		# If we're going through this the first time and we have a zero dimensional
 		# set of points found so far, we want the normal to be the vector which we
 		# minimized, i.e. [1,0,...,0], rather than what we get by taking the Hermite
 		# Normal Form normal.
-		if (Counter == 1) or len(FirstPts) == 1:	
-			Normal[0] = 1
-			for i in xrange(1,len(Normal)):
-				Normal[i] = 0
+		if (Counter == 1):
+			Normal = []
+			Normal.append(1)
+			for i in xrange(1,len(FirstPts[0])):
+				Normal.append(0)
 		UCT, NewNormal = GetUCTAndNormal(Normal)
-		print ""
-		print "ROUND: ", Counter
-		print "Normal:" , Normal
-		print HNF
-		print "UCTOFNORMAL:", TransformPt(NewNormal[0], UCT)
-		print "NewNormal:" , NewNormal
-		print "UCT:"
-		print UCT
-		print "FirstPts", FirstPts
-		print "TransformedFirstPts", TransformPts(FirstPts, UCT)
-		print "ALLPTSTRANSFORMED", TransformPts(Pts, UCT)
-		if len(NewNormal) > 1:
-			return "This is a disaster!!!!"
 		NewNormal = NewNormal[0]
 		NewPts = TransformPts(Pts, UCT)
-		# Find the new points and add them to FirstPts. We add the points in the
+		NewFirstPts = TransformPts(FirstPts,UCT)
+
+		# We check which way the normal should be pointed, positive or negative.
+		# Note that I'm using outer normals. Another way of dealing with this would
+		# be using the barycenter.
+		if not NormalShouldBePositive(NewPts, NewFirstPts):
+			NewNormal[0] = -1
+
+		# Find a new point and add it to FirstPts. We add the points in the
 		# original space since FirstPts is in the original space. Also, we transform
 		# the normal to the new space, because otherwise its value is meaningless.
-		FirstPts = FirstPts + TransformPts(GetMaximalPts(NewPts, FirstPts, NewNormal), matrix(UCT^-1,ZZ))
-	print FirstPts
+		FirstPts = FirstPts + TransformPts(GetAMaximalPt(NewPts, NewFirstPts, NewNormal), matrix(UCT^-1,ZZ))
+		
+		# Finally, we do another unimodular coordinate transform to find whatever 
+		# other points lie on our facet that we haven't yet found.
+		UCT = GetUCT(FirstPts)
+		NewFirstPts = TransformPts(FirstPts, UCT)
+		NewPts = TransformPts(Pts, UCT)
+		VerticalPlaneCoord = NewFirstPts[0][0]
+		for Pt in NewPts:
+			if (Pt[0] == VerticalPlaneCoord) and (Pt not in NewFirstPts):
+				NewFirstPts.append(Pt)
+		FirstPts = TransformPts(NewFirstPts, matrix(UCT^-1, ZZ))
+
+	print "Final FirstPtsList: ", FirstPts
 	return MakeFacet(FirstPts)
 #Question for Jan: why is it that the normal doesn't also transform?
 
@@ -143,10 +153,10 @@ TetrahedronExtraPts = [[1,1,1], [1,-1,-1], [-1,1,-1], [-1,-1,1],[0,0,0],[1,0,0]]
 Tetrahedron = [[1,1,1], [1,-1,-1], [-1,1,-1], [-1,-1,1]]
 TippedOverHouse = [[0,0,0],[2,0,0],[0,2,0],[2,2,0],[0,0,2],[2,0,2],[0,2,2],[2,2,2],[3,1,1]]
 Tests = [(TestCube,'Cube'), (Tetrahedron,'Tetrahedron'),(TippedOverHouse,'TippedOverHouse'),(TetrahedronExtraPts,'TetrahedronExtraPts'),(BigCube,'BigCube')]
-Tests = [(Tetrahedron,'Tetrahedron'),(TippedOverHouse,'TippedOverHouse'),(TetrahedronExtraPts,'TetrahedronExtraPts')]
+#Tests = [(Tetrahedron,'Tetrahedron'),(TippedOverHouse,'TippedOverHouse'),(TetrahedronExtraPts,'TetrahedronExtraPts')]
+#Tests = [(Tetrahedron,'Tetrahedron')]
 
-
-Tests = [(TippedOverHouse,'TippedOverHouse')]
+#Tests = [(TippedOverHouse,'TippedOverHouse')]
 for Test in Tests:
 	Pts = Test[0]
 	print Test[1]

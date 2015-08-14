@@ -1,5 +1,6 @@
--How do I find a normal to a facet? It won't be an nx(n+1) matrix
-ANSWER: Deal with vectors instead of points.
+I am rotating the polytope far too often (I call GetUCT 5 times in my code, and that needs to decrease a bunch). I'm rotating it around when I shouldn't be, because I was trying to avoid issues I had with angles.
+Instead of taking arbitrary normals to edges and then doing a UCT, I should take the normal to the edge that also goes through the known facet that the edge lies on. This means I need to rewrite my pseudocode algorithm before I do anything else.
+
 -Currently, I'm keeping the vertices, not references to the vertices. This needs to be improved
--Refer to Jan's thesis page 85. I need to do UCT*v, not UCT*(list of points). The W's on the bottom of page 84 may be HNF.
-ANSWER: Done.
+
+-ALSO, think about adding in some testing for the MakeFacet routine. When I do a UCT in it, make sure all of the points lie on one side of it. Add in testing for random polytopes.

@@ -91,6 +91,26 @@ def GetHNF(Pts):
 	return ConvertMatrixToList(HNFMatrix)
 
 #-------------------------------------------------------------------------------
+def GetHNFFromVectorAndPts(Vector, Pts):
+	# Instead of thinking about these as points, we should think about these as
+	# being vectors.
+	def ConvertMatrixToList(Matrix):
+		Pts = []
+		for Row in Matrix:
+			Pts.append(list(Row))
+		return Pts
+	if len(Pts) < 2:
+		return "Insufficient points for a Hermite Normal Form"
+
+	Vectors = []
+	Pt = Pts[0]
+	for i in xrange(1,len(Pts)):
+		Vectors.append([Pt[j] - Pts[i][j] for j in xrange(len(Pt))])
+	Vectors.append(Vector)
+	HNFMatrix = (matrix(Vectors)).echelon_form(include_zero_rows = False)
+	return ConvertMatrixToList(HNFMatrix)
+
+#-------------------------------------------------------------------------------
 def GetNormalFromHNF(HNF):
 	M = matrix(HNF)
 	HNF = []
@@ -211,3 +231,107 @@ def TransformPts(Pts, UCT):
 #-------------------------------------------------------------------------------
 def TransformPt(Pt, UCT):
 	return TransformPts([Pt], UCT)[0]
+
+#-------------------------------------------------------------------------------
+def FindBarycenter(Pts):
+	Barycenter = [0 for i in xrange(len(Pts[0]))]
+	for i in xrange(len(Pts)):
+		for j in xrange(len(Pts[i])):
+			Barycenter[j] += Pts[i][j]
+	for i in xrange(len(Barycenter)):
+		Barycenter[i] = Barycenter[i]/len(Pts)
+	return Barycenter
+
+#-------------------------------------------------------------------------------
+def MakeVector(Pt1, Pt2):
+	# The first point is where the vector originates and the second is where it points
+	Vector = []
+	for i in xrange(len(Pt1)):
+		Vector.append(Pt2[i] - Pt1[i])
+	return Vector
+
+#-------------------------------------------------------------------------------
+def NormalPointsTowardsPt(Normal, Barycenter, Pt):
+	def DistanceBetweenPts(Pt1, Pt2):
+		D = 0
+		for i in xrange(len(Pt1)):
+			D += (Pt1[i] - Pt2[i])^2
+		return D
+	NegNormal = [-Normal[i] for i in xrange(len(Normal))]
+	NormalDistance = DistanceBetweenPts(Barycenter, [Normal[i] + Pt[i] for i in xrange(len(Pt))])
+	NegNormalDistance = DistanceBetweenPts(Barycenter, [NegNormal[i] + Pt[i] for i in xrange(len(Pt))])
+	if NegNormalDistance > NormalDistance:
+		return True
+	elif NegNormalDistance < NormalDistance:
+		return False
+	return 
+
+#-------------------------------------------------------------------------------
+def FindNewFacetPts(Pts, Edge, Normal, Barycenter):
+	# Note that the input normal is an inner normal
+	NormalThroughFacet = GetNormalFromHNF(GetHNFFromVectorAndPts(Normal, Edge))
+	print "NormalThroughFacet", NormalThroughFacet
+	# I want this to be an outer facing normal
+	if NormalPointsTowardsPt(NormalThroughFacet, Barycenter, Edge[0]):
+		NormalThroughFacet = [-NormalThroughFacet[i] for i in xrange(len(NormalThroughFacet))]
+	print NormalThroughFacet
+	# Note that the smallest angle will have the largest cos(theta). We are trying
+	# to find all of the points where the angle is minimized, because these points
+	# are the points on the new facet.
+	MaxCosTheta = -1
+	NewFacetPts = []
+	for Pt in Pts:
+		if Pt not in Edge:
+			TestTheta = FindCosTheta(NormalThroughFacet, MakeVector(Edge[0], Pt))
+			print Pt, TestTheta, MakeVector(Edge[0], Pt)
+			if TestTheta > MaxCosTheta:
+				MaxCosTheta = TestTheta
+				NewFacetPts = [Pt]
+			elif TestTheta == MaxCosTheta:
+				NewFacetPts.append(Pt)
+	print MaxCosTheta
+	print NewFacetPts
+	print Edge[0]
+	raw_input()
+
+	return NewFacetPts
+
+#-------------------------------------------------------------------------------
+def MakeUnitVector(V):
+	Norm = NormVector(V)
+	if (Norm == 0) or (Norm == 1):
+		return V
+	elif (Norm == -1):
+		return [-V[i] for i in xrange(len(V))]
+	return [V[i]/Norm for i in xrange(len(V))]
+
+#-------------------------------------------------------------------------------
+def FindNewFacetPtsTwo(Pts, Edge, Normal, KnownFacetPts):
+	# Note that the input normal is an inner normal
+	NormalThroughFacet = GetNormalFromHNF(GetHNFFromVectorAndPts(Normal, Edge))
+	# I want this to be an outer facing normal
+	for Pt in KnownFacetPts:
+		if Pt not in Edge:
+			AdditionalPtOnFacet = Pt
+			break
+	# NOTE: I AM NOT SURE WHY THERE IS A NOT IN THE FOLLOWING LINE. According to
+	# Computational Geometry: An Introduction, I don't think there should be.
+	if not NormalPointsTowardsPt(NormalThroughFacet, AdditionalPtOnFacet, Edge[0]):
+		NormalThroughFacet = [-NormalThroughFacet[i] for i in xrange(len(NormalThroughFacet))]
+	NormalThroughFacet = MakeUnitVector(NormalThroughFacet)
+	Normal = MakeUnitVector(Normal)
+	# Note that the smallest angle will have the largest cos(theta). We are trying
+	# to find all of the points where the angle is minimized, because these points
+	# are the points on the new facet.
+	MaxCosTheta = -1000
+	NewFacetPts = []
+	for Pt in Pts:
+		if Pt not in KnownFacetPts:
+			Vector = MakeVector(Edge[0], Pt)
+			TestTheta = - float(DotProduct(Vector, NormalThroughFacet))/float(DotProduct(Vector, Normal))
+			if TestTheta > MaxCosTheta:
+				MaxCosTheta = TestTheta
+				NewFacetPts = [Pt]
+			elif TestTheta == MaxCosTheta:
+				NewFacetPts.append(Pt)
+	return NewFacetPts

@@ -1,6 +1,6 @@
 class Face:
 	def __init__(self):
-		self.Normal = -1
+		self.InnerNormal = -1
 		self.KnowsAllNeighbors = False
 		self.Parents = []
 		self.Children = []
@@ -10,7 +10,7 @@ class Face:
 	def PrintProps(self):
 		print ""
 		print "Below is a face of dimension " , self.Dimension
-		print "Normal = " , self.Normal
+		print "InnerNormal = " , self.InnerNormal
 		print "KnowsAllNeighbors = " , self.KnowsAllNeighbors
 		print "Vertices = ", self.Vertices
 		print ""

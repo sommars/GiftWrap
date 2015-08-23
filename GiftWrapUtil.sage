@@ -323,13 +323,48 @@ def FindNewFacetPtsTwo(Pts, Edge, Normal, KnownFacetPts):
 	# Note that the smallest angle will have the largest cos(theta). We are trying
 	# to find all of the points where the angle is minimized, because these points
 	# are the points on the new facet.
-	MaxCosTheta = -1000
+	MaxCosTheta = 'Test'
 	NewFacetPts = []
 	for Pt in Pts:
 		if Pt not in KnownFacetPts:
 			Vector = MakeVector(Edge[0], Pt)
 			TestTheta = - float(DotProduct(Vector, NormalThroughFacet))/float(DotProduct(Vector, Normal))
-			if TestTheta > MaxCosTheta:
+			if MaxCosTheta == 'Test':
+				MaxCosTheta = TestTheta
+				NewFacetPts = [Pt]
+			elif TestTheta > MaxCosTheta:
+				MaxCosTheta = TestTheta
+				NewFacetPts = [Pt]
+			elif TestTheta == MaxCosTheta:
+				NewFacetPts.append(Pt)
+	return NewFacetPts
+
+
+#-------------------------------------------------------------------------------
+def FindNewFacetPtsThree(Pts, PtOnFacet, Normal):
+	# Note that the input normal is an inner normal
+	NormalThroughFacet = [0,0,1]
+	NormalThroughFacet = MakeUnitVector(NormalThroughFacet)
+	Normal = MakeUnitVector(Normal)
+	# Note that the smallest angle will have the largest cos(theta). We are trying
+	# to find all of the points where the angle is minimized, because these points
+	# are the points on the new facet.
+	MaxCosTheta = 'Test'
+	NewFacetPts = []
+	for Pt in Pts:
+		if Pt not in PtOnFacet:
+			Vector = MakeVector(PtOnFacet[0], Pt)
+			if float(DotProduct(Vector, Normal)) == 0:
+				print "Pts", Pts
+				print "Vector", Vector
+				print "PtOnFacet", PtOnFacet
+				print "TestPt", Pt
+				raw_input()
+			TestTheta = - float(DotProduct(Vector, NormalThroughFacet))/float(DotProduct(Vector, Normal))
+			if MaxCosTheta == 'Test':
+				MaxCosTheta = TestTheta
+				NewFacetPts = [Pt]
+			elif TestTheta > MaxCosTheta:
 				MaxCosTheta = TestTheta
 				NewFacetPts = [Pt]
 			elif TestTheta == MaxCosTheta:

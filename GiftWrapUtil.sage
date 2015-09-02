@@ -133,31 +133,6 @@ def NormVector(U):
 	return Norm**.5
 
 #-------------------------------------------------------------------------------
-def FindCosTheta(U,V):
-#This feels wrong
-	return float(DotProduct(U,V))/float((NormVector(U)*NormVector(V)))
-
-#-------------------------------------------------------------------------------
-def GetAMaximalPt(Pts, FacetPts, Normal):
-	# We need some value to start with for theta, so pick the first valid option
-	for i in xrange(len(Pts)):
-		Pt = Pts[i]
-		if (Pt not in FacetPts and not PtIsZero(Pt)):
-			Theta = FindCosTheta(Pt, Normal)
-			MaximalPt = Pt
-			break
-
-	# We don't need to go through all values, since we've already gone through some
-	for j in xrange(i+1,len(Pts)):
-		Pt = Pts[j]
-		if (Pt not in FacetPts and not PtIsZero(Pt)):
-			TestTheta = FindCosTheta(Pt, Normal)
-			if TestTheta > Theta:
-				MaximalPt = Pt
-				Theta = TestTheta
-	return MaximalPt
-
-#-------------------------------------------------------------------------------
 def NormalShouldBePositive(Pts, FacetPts):
 	FacetVertValue = FacetPts[0][0]
 	for i in xrange(1,len(FacetPts)):
@@ -183,31 +158,6 @@ def NormalShouldBePositive(Pts, FacetPts):
 				raw_input()
 				return "All of the points aren't to the same side of the hyperplane"
 	return NormalShouldBePositive
-
-#-------------------------------------------------------------------------------
-def GetMaxAndMinPt(Pts, FacetPts, Normal):
-	# We need some value to start with for the thetas, so pick the first valid option
-	for i in xrange(len(Pts)):
-		Pt = Pts[i]
-		if (Pt not in FacetPts and not PtIsZero(Pt)):
-			MaxTheta = FindCosTheta(Pt, Normal)
-			MinTheta = MaxTheta
-			MaximalPt = Pt
-			MinimalPt = Pt
-			break
-	print Pt, i, MaxTheta
-	# We don't need to go through all values, since we've already gone through some
-	for j in xrange(i+1,len(Pts)):
-		Pt = Pts[j]
-		if (Pt not in FacetPts and not PtIsZero(Pt)):
-			TestTheta = FindCosTheta(Pt, Normal)
-			if TestTheta > MaxTheta:
-				MaximalPt = Pt
-				MaxTheta = TestTheta
-			if TestTheta < MinTheta:
-				MinimalPt = Pt
-				MinTheta = TestTheta
-	return MaximalPt, MinimalPt
 
 #-------------------------------------------------------------------------------
 def PtIsZero(Pt):
@@ -264,37 +214,7 @@ def NormalPointsTowardsPt(Normal, Barycenter, Pt):
 		return True
 	elif NegNormalDistance < NormalDistance:
 		return False
-	return 
-
-#-------------------------------------------------------------------------------
-def FindNewFacetPts(Pts, Edge, Normal, Barycenter):
-	# Note that the input normal is an inner normal
-	NormalThroughFacet = GetNormalFromHNF(GetHNFFromVectorAndPts(Normal, Edge))
-	print "NormalThroughFacet", NormalThroughFacet
-	# I want this to be an outer facing normal
-	if NormalPointsTowardsPt(NormalThroughFacet, Barycenter, Edge[0]):
-		NormalThroughFacet = [-NormalThroughFacet[i] for i in xrange(len(NormalThroughFacet))]
-	print NormalThroughFacet
-	# Note that the smallest angle will have the largest cos(theta). We are trying
-	# to find all of the points where the angle is minimized, because these points
-	# are the points on the new facet.
-	MaxCosTheta = -1
-	NewFacetPts = []
-	for Pt in Pts:
-		if Pt not in Edge:
-			TestTheta = FindCosTheta(NormalThroughFacet, MakeVector(Edge[0], Pt))
-			print Pt, TestTheta, MakeVector(Edge[0], Pt)
-			if TestTheta > MaxCosTheta:
-				MaxCosTheta = TestTheta
-				NewFacetPts = [Pt]
-			elif TestTheta == MaxCosTheta:
-				NewFacetPts.append(Pt)
-	print MaxCosTheta
-	print NewFacetPts
-	print Edge[0]
-	raw_input()
-
-	return NewFacetPts
+	return
 
 #-------------------------------------------------------------------------------
 def MakeUnitVector(V):
@@ -306,7 +226,88 @@ def MakeUnitVector(V):
 	return [V[i]/Norm for i in xrange(len(V))]
 
 #-------------------------------------------------------------------------------
-def FindNewFacetPtsTwo(Pts, Edge, Normal, KnownFacetPts):
+def FindNewFacetPts(Pts, Edge, Normal, KnownFacetPts, NormalThroughFacet):
+	Tolerance = .00001
+	NormalThroughFacet = MakeUnitVector(NormalThroughFacet)
+	Normal = MakeUnitVector(Normal)
+	# Note that the smallest angle will have the largest cot(theta). We are trying
+	# to find all of the points where the angle is minimized, because these points
+	# are the points on the new facet.
+	MaxCosTheta = 'Test'
+	NewFacetPts = []
+	for Pt in Pts:
+		if Pt not in KnownFacetPts:
+
+			Vector = MakeVector(Edge[0], Pt)
+			if float(DotProduct(Vector, Normal)) == 0:
+				print "Denominator == 0!"
+				raw_input()
+			TestTheta = - float(DotProduct(Vector, NormalThroughFacet))/float(DotProduct(Vector, Normal))
+			#print "Pt", Pt, Vector, TestTheta, DotProduct(Vector, NormalThroughFacet), float(DotProduct(Vector, Normal))
+			if MaxCosTheta == 'Test':
+				MaxCosTheta = TestTheta
+				NewFacetPts = [Pt]
+			else: 
+				Diff = TestTheta - MaxCosTheta
+				if Diff > Tolerance:
+					MaxCosTheta = TestTheta
+					NewFacetPts = [Pt]
+				elif abs(Diff) < Tolerance:
+					NewFacetPts.append(Pt)
+	return NewFacetPts
+
+#-------------------------------------------------------------------------------
+def FindNewFacetPtsThree(Pts, Edge, Normal, KnownFacetPts, NormalThroughFacet):
+	def DistanceBetweenPts(Pt1, Pt2):
+		D = 0
+		for i in xrange(len(Pt1)):
+			D += (Pt1[i] - Pt2[i])^2
+		return D
+	def PtPlusVector(Vector, Pt):
+		NewPt = []
+		for i in xrange(len(Pt)):
+			NewPt.append(Pt[i] + Vector[i])
+		return NewPt
+	FacetBarycenter = FindBarycenter(KnownFacetPts)
+	Tolerance = .00001
+	NormalThroughFacet = MakeUnitVector(NormalThroughFacet)
+	Normal = MakeUnitVector(Normal)
+	# Note that the smallest angle will have the largest cot(theta). We are trying
+	# to find all of the points where the angle is maximized, because these points
+	# are the points on the new facet.
+	MaxAngle = 'Test'
+	NewFacetPts = []
+	Balls = False
+	for Pt in Pts:
+		if Pt not in KnownFacetPts:
+
+			Vector = MakeVector(Edge[0], Pt)
+			if float(DotProduct(Vector, Normal)) == 0:
+				print "Denominator == 0!"
+				raw_input()
+
+			if DotProduct(NormalThroughFacet, Vector) > 0:
+				TestTheta = float(DotProduct(Vector, NormalThroughFacet))/float(DotProduct(Vector, Normal))
+				Angle = float(pi) - arccot(float(TestTheta))
+			else:
+				NegativeNormalThroughFacet = [-NormalThroughFacet[i] for i in xrange(len(NormalThroughFacet))]
+				TestTheta = float(DotProduct(Vector, NegativeNormalThroughFacet))/float(DotProduct(Vector, Normal))
+				Angle = arccot(float(TestTheta))
+
+			if MaxAngle == 'Test':
+				MaxAngle = Angle
+				NewFacetPts = [Pt]
+			else: 
+				Diff = Angle - MaxAngle
+				if Diff > Tolerance:
+					MaxAngle = Angle
+					NewFacetPts = [Pt]
+				elif abs(Diff) < Tolerance:
+					NewFacetPts.append(Pt)
+	return NewFacetPts
+
+#-------------------------------------------------------------------------------
+def FindNewFacetPtsFromEdge(Pts, Edge, Normal, KnownFacetPts):
 	# Note that the input normal is an inner normal
 	NormalThroughFacet = GetNormalFromHNF(GetHNFFromVectorAndPts(Normal, Edge))
 	# I want this to be an outer facing normal
@@ -314,59 +315,32 @@ def FindNewFacetPtsTwo(Pts, Edge, Normal, KnownFacetPts):
 		if Pt not in Edge:
 			AdditionalPtOnFacet = Pt
 			break
-	# NOTE: I AM NOT SURE WHY THERE IS A NOT IN THE FOLLOWING LINE. According to
-	# Computational Geometry: An Introduction, I don't think there should be.
+	# According to Computational Geometry: An Introduction, the normal needs to
+	# point towards the facet.
 	if not NormalPointsTowardsPt(NormalThroughFacet, AdditionalPtOnFacet, Edge[0]):
-		NormalThroughFacet = [-NormalThroughFacet[i] for i in xrange(len(NormalThroughFacet))]
-	NormalThroughFacet = MakeUnitVector(NormalThroughFacet)
-	Normal = MakeUnitVector(Normal)
-	# Note that the smallest angle will have the largest cos(theta). We are trying
-	# to find all of the points where the angle is minimized, because these points
-	# are the points on the new facet.
-	MaxCosTheta = 'Test'
-	NewFacetPts = []
-	for Pt in Pts:
-		if Pt not in KnownFacetPts:
-			Vector = MakeVector(Edge[0], Pt)
-			TestTheta = - float(DotProduct(Vector, NormalThroughFacet))/float(DotProduct(Vector, Normal))
-			if MaxCosTheta == 'Test':
-				MaxCosTheta = TestTheta
-				NewFacetPts = [Pt]
-			elif TestTheta > MaxCosTheta:
-				MaxCosTheta = TestTheta
-				NewFacetPts = [Pt]
-			elif TestTheta == MaxCosTheta:
-				NewFacetPts.append(Pt)
-	return NewFacetPts
-
+		NormalThroughFacet = [NormalThroughFacet[i] for i in xrange(len(NormalThroughFacet))]
+	return FindNewFacetPts(Pts, Edge, Normal, KnownFacetPts, NormalThroughFacet)
 
 #-------------------------------------------------------------------------------
-def FindNewFacetPtsThree(Pts, PtOnFacet, Normal):
+def FindNewFacetPtsFromEdgeTwo(Pts, Edge, Normal, KnownFacetPts):
 	# Note that the input normal is an inner normal
-	NormalThroughFacet = [0,0,1]
-	NormalThroughFacet = MakeUnitVector(NormalThroughFacet)
-	Normal = MakeUnitVector(Normal)
-	# Note that the smallest angle will have the largest cos(theta). We are trying
-	# to find all of the points where the angle is minimized, because these points
-	# are the points on the new facet.
-	MaxCosTheta = 'Test'
-	NewFacetPts = []
-	for Pt in Pts:
-		if Pt not in PtOnFacet:
-			Vector = MakeVector(PtOnFacet[0], Pt)
-			if float(DotProduct(Vector, Normal)) == 0:
-				print "Pts", Pts
-				print "Vector", Vector
-				print "PtOnFacet", PtOnFacet
-				print "TestPt", Pt
-				raw_input()
-			TestTheta = - float(DotProduct(Vector, NormalThroughFacet))/float(DotProduct(Vector, Normal))
-			if MaxCosTheta == 'Test':
-				MaxCosTheta = TestTheta
-				NewFacetPts = [Pt]
-			elif TestTheta > MaxCosTheta:
-				MaxCosTheta = TestTheta
-				NewFacetPts = [Pt]
-			elif TestTheta == MaxCosTheta:
-				NewFacetPts.append(Pt)
-	return NewFacetPts
+	#print Edge, Normal
+	NormalThroughFacet = GetNormalFromHNF(GetHNFFromVectorAndPts(Normal, Edge))
+	#print GetHNFFromVectorAndPts(Normal, Edge)
+	# I want this to be an outer facing normal
+	for Pt in KnownFacetPts:
+		if Pt not in Edge:
+			AdditionalPtOnFacet = Pt
+			break
+	# For the sake of consistency, point the normal outwards. Decide later if that's what we want
+	if NormalPointsTowardsPt(NormalThroughFacet, AdditionalPtOnFacet, Edge[0]):
+		NormalThroughFacet = [-NormalThroughFacet[i] for i in xrange(len(NormalThroughFacet))]
+	#print NormalThroughFacet
+	#print DotProduct(NormalThroughFacet,Normal)
+	#print DotProduct(NormalThroughFacet, [5,-22,36])
+	return FindNewFacetPtsThree(Pts, Edge, Normal, KnownFacetPts, NormalThroughFacet)
+
+#-------------------------------------------------------------------------------
+def FindNewFacetPtsFromSinglePt(Pts, PtOnFacet, Normal):
+	# Note that the input normal is an inner normal
+	return FindNewFacetPts(Pts, PtOnFacet, Normal, PtOnFacet, [0,0,1])

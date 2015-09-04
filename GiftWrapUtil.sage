@@ -238,15 +238,13 @@ def FindNewFacetPtsThree(Pts, Edge, Normal, KnownFacetPts, NormalThroughFacet):
 			NewPt.append(Pt[i] + Vector[i])
 		return NewPt
 	FacetBarycenter = FindBarycenter(KnownFacetPts)
-	Tolerance = .0000000000000000000000000000000000001
-	NormalThroughFacet = MakeUnitVector(NormalThroughFacet)
-	Normal = MakeUnitVector(Normal)
+	#NormalThroughFacet = MakeUnitVector(NormalThroughFacet)
+	#Normal = MakeUnitVector(Normal)
 	# Note that the smallest angle will have the largest cot(theta). We are trying
 	# to find all of the points where the angle is maximized, because these points
 	# are the points on the new facet.
 	MaxAngle = 'Test'
 	NewFacetPts = []
-	Balls = False
 	for Pt in Pts:
 		if Pt not in KnownFacetPts:
 			Vector = MakeVector(Edge[0], Pt)
@@ -255,24 +253,31 @@ def FindNewFacetPtsThree(Pts, Edge, Normal, KnownFacetPts, NormalThroughFacet):
 			if n(DotProduct(Vector, Normal),1000) == 0:
 				print "Denominator == 0!"
 				raw_input()
-
+			"""
+			print "A"
+			print Vector
+			print NormalThroughFacet
+			print DotProduct(Vector, NormalThroughFacet)
+			print Integer(DotProduct(Vector, NormalThroughFacet))
+			print Integer(DotProduct(Vector, Normal))
+			print Integer(DotProduct(Vector, NormalThroughFacet))/Integer(DotProduct(Vector, Normal))
+			print "B"
+			"""
 			if DotProduct(NormalThroughFacet, Vector) > 0:
-				TestTheta = n(DotProduct(Vector, NormalThroughFacet),1000)/n(DotProduct(Vector, Normal),1000)
-				Angle = n(pi,1000) - arccot(n(TestTheta,1000))
+				TestTheta = Rational(Integer(DotProduct(Vector, NormalThroughFacet))/Integer(DotProduct(Vector, Normal)))
+				Angle = - TestTheta
 			else:
 				NegativeNormalThroughFacet = [-NormalThroughFacet[i] for i in xrange(len(NormalThroughFacet))]
-				TestTheta = n(DotProduct(Vector, NegativeNormalThroughFacet),1000)/n(DotProduct(Vector, Normal),1000)
-				Angle = arccot(n(TestTheta,1000))
-			print Pt, Angle
+				TestTheta = Rational(Integer(DotProduct(Vector, NegativeNormalThroughFacet))/Integer(DotProduct(Vector, Normal)))
+				Angle = TestTheta
 			if MaxAngle == 'Test':
 				MaxAngle = Angle
 				NewFacetPts = [Pt]
 			else: 
-				Diff = Angle - MaxAngle
-				if Diff > Tolerance:
+				if Angle < MaxAngle:
 					MaxAngle = Angle
 					NewFacetPts = [Pt]
-				elif abs(Diff) < Tolerance:
+				elif Angle == MaxAngle:
 					NewFacetPts.append(Pt)
 	return NewFacetPts
 
@@ -280,8 +285,13 @@ def FindNewFacetPtsThree(Pts, Edge, Normal, KnownFacetPts, NormalThroughFacet):
 def FindNewFacetPtsFromEdgeTwo(Pts, Edge, Normal, KnownFacetPts):
 	# Note that the input normal is an inner normal
 	#print Edge, Normal
+	for i in xrange(len(Normal)):
+		Normal[i] = Integer(Normal[i])				
+	for Pt in Edge:
+		for i in xrange(len(Pt)):
+			Pt[i] = Integer(Pt[i])
 	NormalThroughFacet = GetNormalFromHNF(GetHNFFromVectorAndPts(Normal, Edge))
-	#print GetHNFFromVectorAndPts(Normal, Edge)
+
 	# I want this to be an outer facing normal
 	for Pt in KnownFacetPts:
 		if Pt not in Edge:

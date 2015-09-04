@@ -131,7 +131,7 @@ def NormVector(U):
 	for i in range(len(U)):
 		Norm += U[i]*U[i]
 	return Norm**.5
-
+"""
 #-------------------------------------------------------------------------------
 def NormalShouldBePositive(Pts, FacetPts):
 	FacetVertValue = FacetPts[0][0]
@@ -165,7 +165,7 @@ def PtIsZero(Pt):
 		if Coord != 0:
 			return False
 	return True
-
+"""
 #-------------------------------------------------------------------------------
 def TransformPts(Pts, UCT):
 	def ConvertMatrixToList(Matrix):
@@ -238,7 +238,7 @@ def FindNewFacetPtsThree(Pts, Edge, Normal, KnownFacetPts, NormalThroughFacet):
 			NewPt.append(Pt[i] + Vector[i])
 		return NewPt
 	FacetBarycenter = FindBarycenter(KnownFacetPts)
-	Tolerance = .0000000000000000000000000000000000000000000000000000000000000000001
+	Tolerance = .0000000000000000000000000000000000001
 	NormalThroughFacet = MakeUnitVector(NormalThroughFacet)
 	Normal = MakeUnitVector(Normal)
 	# Note that the smallest angle will have the largest cot(theta). We are trying
@@ -252,18 +252,18 @@ def FindNewFacetPtsThree(Pts, Edge, Normal, KnownFacetPts, NormalThroughFacet):
 			Vector = MakeVector(Edge[0], Pt)
 			#print Pt, Edge, Normal, Vector, float(DotProduct(Vector, Normal)), DotProduct(Vector, Normal)
 			#print KnownFacetPts
-			if float(DotProduct(Vector, Normal)) == 0:
+			if n(DotProduct(Vector, Normal),1000) == 0:
 				print "Denominator == 0!"
 				raw_input()
 
 			if DotProduct(NormalThroughFacet, Vector) > 0:
-				TestTheta = float(DotProduct(Vector, NormalThroughFacet))/float(DotProduct(Vector, Normal))
-				Angle = float(pi) - arccot(float(TestTheta))
+				TestTheta = n(DotProduct(Vector, NormalThroughFacet),1000)/n(DotProduct(Vector, Normal),1000)
+				Angle = n(pi,1000) - arccot(n(TestTheta,1000))
 			else:
 				NegativeNormalThroughFacet = [-NormalThroughFacet[i] for i in xrange(len(NormalThroughFacet))]
-				TestTheta = float(DotProduct(Vector, NegativeNormalThroughFacet))/float(DotProduct(Vector, Normal))
-				Angle = arccot(float(TestTheta))
-
+				TestTheta = n(DotProduct(Vector, NegativeNormalThroughFacet),1000)/n(DotProduct(Vector, Normal),1000)
+				Angle = arccot(n(TestTheta,1000))
+			print Pt, Angle
 			if MaxAngle == 'Test':
 				MaxAngle = Angle
 				NewFacetPts = [Pt]

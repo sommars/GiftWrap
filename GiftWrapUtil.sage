@@ -67,7 +67,10 @@ def GetUCTAndNormal(Vector):
 	#We need to check to make sure we're getting the right
 	UCT = ((UCT)^-1)
 	if ConvertMatrixToList(UCT)[0] != Vector:
-		return "AAASDFASFDASDFKASDF"
+		print "Unexpected first row after UCT. Should be vector"
+		print "Vector = ", Vector
+		print "UCT", UCT
+		raw_input()
 	return UCT.transpose(), ConvertMatrixToList(HNF)
 
 #-------------------------------------------------------------------------------
@@ -126,47 +129,6 @@ def DotProduct(U,V):
 	return DotProduct
 
 #-------------------------------------------------------------------------------
-def NormVector(U):
-	Norm = 0
-	for i in range(len(U)):
-		Norm += U[i]*U[i]
-	return Norm**.5
-"""
-#-------------------------------------------------------------------------------
-def NormalShouldBePositive(Pts, FacetPts):
-	FacetVertValue = FacetPts[0][0]
-	for i in xrange(1,len(FacetPts)):
-		if FacetVertValue != FacetPts[i][0]:
-			print "All of the facetpts aren't on the same hyperplane"
-			raw_input()
-			return "All of the facetpts aren't on the same hyperplane"
-	# Sentinel value so that we know the value hasn't been set
-	NormalShouldBePositive = -1
-	for i in xrange(len(Pts)):
-		if FacetVertValue > Pts[i][0]:
-			if NormalShouldBePositive == -1:
-				NormalShouldBePositive = True
-			elif NormalShouldBePositive == False:
-				print "All of the points aren't to the same side of the hyperplane"
-				raw_input()
-				return "All of the points aren't to the same side of the hyperplane"
-		elif FacetVertValue < Pts[i][0]:
-			if NormalShouldBePositive == -1:
-				NormalShouldBePositive = False
-			elif NormalShouldBePositive == True:	
-				print "All of the points aren't to the same side of the hyperplane"
-				raw_input()
-				return "All of the points aren't to the same side of the hyperplane"
-	return NormalShouldBePositive
-
-#-------------------------------------------------------------------------------
-def PtIsZero(Pt):
-	for Coord in Pt:
-		if Coord != 0:
-			return False
-	return True
-"""
-#-------------------------------------------------------------------------------
 def TransformPts(Pts, UCT):
 	def ConvertMatrixToList(Matrix):
 		Pts = []
@@ -217,16 +179,7 @@ def NormalPointsTowardsPt(Normal, Barycenter, Pt):
 	return
 
 #-------------------------------------------------------------------------------
-def MakeUnitVector(V):
-	Norm = NormVector(V)
-	if (Norm == 0) or (Norm == 1):
-		return V
-	elif (Norm == -1):
-		return [-V[i] for i in xrange(len(V))]
-	return [V[i]/Norm for i in xrange(len(V))]
-
-#-------------------------------------------------------------------------------
-def FindNewFacetPtsThree(Pts, Edge, Normal, KnownFacetPts, NormalThroughFacet):
+def FindNewFacetPts(Pts, Edge, Normal, KnownFacetPts, NormalThroughFacet):
 	def DistanceBetweenPts(Pt1, Pt2):
 		D = 0
 		for i in xrange(len(Pt1)):
@@ -238,8 +191,6 @@ def FindNewFacetPtsThree(Pts, Edge, Normal, KnownFacetPts, NormalThroughFacet):
 			NewPt.append(Pt[i] + Vector[i])
 		return NewPt
 	FacetBarycenter = FindBarycenter(KnownFacetPts)
-	#NormalThroughFacet = MakeUnitVector(NormalThroughFacet)
-	#Normal = MakeUnitVector(Normal)
 	# Note that the smallest angle will have the largest cot(theta). We are trying
 	# to find all of the points where the angle is maximized, because these points
 	# are the points on the new facet.
@@ -248,21 +199,9 @@ def FindNewFacetPtsThree(Pts, Edge, Normal, KnownFacetPts, NormalThroughFacet):
 	for Pt in Pts:
 		if Pt not in KnownFacetPts:
 			Vector = MakeVector(Edge[0], Pt)
-			#print Pt, Edge, Normal, Vector, float(DotProduct(Vector, Normal)), DotProduct(Vector, Normal)
-			#print KnownFacetPts
 			if n(DotProduct(Vector, Normal),1000) == 0:
 				print "Denominator == 0!"
 				raw_input()
-			"""
-			print "A"
-			print Vector
-			print NormalThroughFacet
-			print DotProduct(Vector, NormalThroughFacet)
-			print Integer(DotProduct(Vector, NormalThroughFacet))
-			print Integer(DotProduct(Vector, Normal))
-			print Integer(DotProduct(Vector, NormalThroughFacet))/Integer(DotProduct(Vector, Normal))
-			print "B"
-			"""
 			if DotProduct(NormalThroughFacet, Vector) > 0:
 				TestTheta = Rational(Integer(DotProduct(Vector, NormalThroughFacet))/Integer(DotProduct(Vector, Normal)))
 				Angle = - TestTheta
@@ -282,9 +221,8 @@ def FindNewFacetPtsThree(Pts, Edge, Normal, KnownFacetPts, NormalThroughFacet):
 	return NewFacetPts
 
 #-------------------------------------------------------------------------------
-def FindNewFacetPtsFromEdgeTwo(Pts, Edge, Normal, KnownFacetPts):
+def FindNewFacetPtsFromEdge(Pts, Edge, Normal, KnownFacetPts):
 	# Note that the input normal is an inner normal
-	#print Edge, Normal
 	for i in xrange(len(Normal)):
 		Normal[i] = Integer(Normal[i])				
 	for Pt in Edge:
@@ -300,12 +238,53 @@ def FindNewFacetPtsFromEdgeTwo(Pts, Edge, Normal, KnownFacetPts):
 	# For the sake of consistency, point the normal outwards. Decide later if that's what we want
 	if NormalPointsTowardsPt(NormalThroughFacet, AdditionalPtOnFacet, Edge[0]):
 		NormalThroughFacet = [-NormalThroughFacet[i] for i in xrange(len(NormalThroughFacet))]
-	#print NormalThroughFacet
-	#print DotProduct(NormalThroughFacet,Normal)
-	#print DotProduct(NormalThroughFacet, [5,-22,36])
-	return FindNewFacetPtsThree(Pts, Edge, Normal, KnownFacetPts, NormalThroughFacet)
+	return FindNewFacetPts(Pts, Edge, Normal, KnownFacetPts, NormalThroughFacet)
 
 #-------------------------------------------------------------------------------
-def FindNewFacetPtsFromSinglePt(Pts, PtOnFacet, Normal):
+def FindNewFacetPtsFromSinglePt(Pts, PtOnFacet):
 	# Note that the input normal is an inner normal
-	return FindNewFacetPtsThree(Pts, PtOnFacet, Normal, PtOnFacet, [0,0,1])
+	return FindNewFacetPtsThree(Pts, PtOnFacet, [-1,0,0], PtOnFacet, [0,0,1])
+	
+#-------------------------------------------------------------------------------
+def CheckAllPtsLieOnOthersideOfFacetHyperplane(Pts, FacetPts, UCT):
+	Pts = TransformPts(Pts, UCT)
+	for Pt in FacetPts:
+		Pts.remove(Pt)
+	
+	# Start by checking that the UCT sends all of the points to the same side
+	VertHyperplaneX = FacetPts[0][0]
+	for i in xrange(1,len(FacetPts)):
+		if FacetPts[i][0] != VertHyperplaneX:
+			print "Internal error, the facet points do not all lie on the same vertical hyperplane after a UCT."
+			print FacetPts
+			raw_input()
+
+	VertHyperplaneIsGreatest = "Maybe"
+	for Pt in Pts:
+		if VertHyperplaneIsGreatest == True and Pt[0] > VertHyperplaneX:
+			print "Internal error: all points do not lie on the same side of the facet hyperplane"
+			print Pt
+			print TransformPt(Pt, matrix(UCT^-1, ZZ))
+			print VertHyperplaneX
+			print Pts
+			raw_input()
+		elif VertHyperplaneIsGreatest == False and Pt[0] < VertHyperplaneX:
+			print "Internal error: all points do not lie on the same side of the facet hyperplane"
+			print Pt
+			print TransformPt(Pt, matrix(UCT^-1, ZZ))
+			print VertHyperplaneX
+			print Pts
+			raw_input()
+		elif VertHyperplaneIsGreatest == "Maybe":
+			if Pt[0] < VertHyperplaneX:
+				VertHyperplaneIsGreatest = True
+			if Pt[0] > VertHyperplaneX:
+				VertHyperplaneIsGreatest = False
+		elif Pt[0] == VertHyperplaneX:
+			print "Internal error: all points do not lie on the same side of the facet hyperplane"
+			print Pt
+			print TransformPt(Pt, matrix(UCT^-1, ZZ))
+			print VertHyperplaneX
+			print Pts
+			raw_input()
+	return

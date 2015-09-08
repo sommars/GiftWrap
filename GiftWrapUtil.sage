@@ -28,18 +28,13 @@ def RemovePts(Pts, PtsToRemove):
 
 #-------------------------------------------------------------------------------
 def CheckNormalFormDim(HNF):
-	def RowIsZero(Row):
-		for Int in Row:
-			if Int != 0:
-				return False
-		return True
 	Dim = 0
 	for i in xrange(len(HNF[0])):
 		if HNF[Dim][i] != 0:
 			Dim += 1
 			if Dim == len(HNF):
 				break
-	return Dim - 1
+	return Dim
 
 """
 There are two different ways that we use the hermite normal form. We use it to
@@ -288,3 +283,54 @@ def CheckAllPtsLieOnOthersideOfFacetHyperplane(Pts, FacetPts, UCT):
 			print Pts
 			raw_input()
 	return
+	
+#-------------------------------------------------------------------------------
+def MakePointMap(Pts):
+	HNF = GetHNF(Pts)
+	Dim = CheckNormalFormDim(HNF)
+	if Dim != len(Pts[0]):
+		UCT = GetUCT(GetNormalFromHNF(GetHNF(Pts)))
+		NewPts = TransformPts(Pts, UCT)
+		Row = copy(NewPts[0])
+		for i in xrange(1, len(NewPts)):
+			for j in xrange(len(NewPts[0])):
+				if NewPts[i][j] != Row[j]:
+					Row[j] = "Diff"
+		ValuesToPrepend = []
+		for i in xrange(len(Row)):
+			if Row[i] != "Diff":
+				ValuesToPrepend.append(Row[i])
+			if i != 0 and Row[i] != "Diff" and Row[i-1] == "Diff":
+				print "Internal error: unexpected result from HNF in transformingpts"
+				print Row
+				print Pts
+				raw_input()
+		GoodPts = []
+		for i in xrange(len(NewPts)):
+			GoodPts.append([])
+			for j in xrange(len(NewPts[i])):
+				if Row[j] == "Diff":
+					GoodPts[i].append(NewPts[i][j])
+		ReverseUCT = matrix(UCT^-1, ZZ)
+		PointMap = {}
+		for Pt in GoodPts:
+			PointMap[tuple(Pt)] = TransformPt(ValuesToPrepend + Pt, ReverseUCT)
+	else:
+		GoodPts = copy(Pts)
+		PointMap = {}
+		for Pt in GoodPts:
+			PointMap[tuple(Pt)] = Pt
+	return GoodPts, PointMap, Dim
+
+#-------------------------------------------------------------------------------
+def PutFacetsInCorrectDimension(Facets, PointMap, Barycenter):
+	for Facet in Facets:
+		CorrectVertices = []
+		for Vertex in Facet.Vertices:
+			CorrectVertices.append(PointMap[tuple(Vertex)])
+		Facet.Vertices = CorrectVertices
+		Normal = GetNormalFromHNF(GetHNF(CorrectVertices))
+		if not NormalPointsTowardsPt(Normal, Barycenter, CorrectVertices[0]):
+			Normal = [-Normal[i] for i in xrange(len(Normal))]
+		Facet.InnerNormal = Normal
+	return Facets

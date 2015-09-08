@@ -5,9 +5,12 @@ def GiftWrap(Pts):
 	if not PtsAreValid(Pts):
 		return "The input set of points is not valid."
 	Pts = RemoveDups(Pts)
+	OriginalBarycenter = FindBarycenter(Pts)
+	global InitialDim
+	Pts, PointMap, InitialDim = MakePointMap(Pts)
 	global Barycenter
 	Barycenter = FindBarycenter(Pts)
-	if CheckNormalFormDim(GetHNF(Pts)) != 2:
+	if InitialDim != 3:
 		print "This set of point is not full dimensional"
 		return
 	InitialFacet, PtsToRemove, EdgeList = FindInitialFacet(Pts)
@@ -24,7 +27,7 @@ def GiftWrap(Pts):
 			Vertices = Facet.Vertices
 			if (Edge[0] in Vertices) and (Edge[1] in Vertices):
 				break
-		
+
 		Counter += 1
 		if Counter == 200:
 			return
@@ -56,7 +59,7 @@ def GiftWrap(Pts):
 			if Vertex in InteriorPts:
 				InteriorPts.remove(Vertex)
 	Pts = RemovePts(Pts, InteriorPts)
-
+	Facets = PutFacetsInCorrectDimension(Facets, PointMap, OriginalBarycenter)
 	# Euler Characteristic check
 	EdgeCount = 0
 	for Facet in Facets:
@@ -66,6 +69,8 @@ def GiftWrap(Pts):
 	if len(Pts) - EdgeCount + len(Facets) != 2:
 		print "Euler Characteristic failed!"
 		raw_input()
+	# Note that in 4d it would be if len(Pts) - EdgeCount + len(3faces) - len(4faces) != 0:
+	# In general, it's F_0 - F_1 + F_2 .... F_N != 1 + (-1)^(N+1)
 	return Facets
 
 #-------------------------------------------------------------------------------
@@ -88,7 +93,7 @@ def FindInitialFacet(Pts):
 		FirstPts = FirstPts + FindNewFacetPtsFromSinglePt(Pts, FirstPts)
 
 		# Now we have either an edge or a facet. Need to check which via a dimension calculation
-		if CheckNormalFormDim(GetHNF(FirstPts)) == 1:
+		if CheckNormalFormDim(GetHNF(FirstPts)) == 2:
 			return MakeFacet(FirstPts, Pts)
 
 		# Here I manufacture a point to create a fake facet. This allows me to
@@ -111,13 +116,13 @@ def FindInitialFacet(Pts):
 		HNF = GetHNF(FirstPts)
 		Dim = CheckNormalFormDim(HNF)
 		# This is the case in which I immediately find a facet in vertical position
-		if Dim == 1:
+		if Dim == 2:
 			return MakeFacet(FirstPts, Pts)
 
 		# I have found an edge. I can do roughly the same thing I do in the general
 		# situation. I have the same normal to the hyperplane [-1,0,0]. 
 		# I must use a specific normal to the point set
-		elif Dim == 0:
+		elif Dim == 1:
 			Normal = [-1,0,0]
 			
 			# This is a way to manufacture a third point on the facet.
@@ -170,13 +175,13 @@ def MakeFacet(FacetPts, Pts):
 	Facet.Vertices = Hull
 	Facet.Children = Hull
 	Dim = CheckNormalFormDim(GetHNF(Hull))
-	if Dim != 1:
+	if Dim != 2:
 		print "Internal error, 2d convex hull is in the wrong dimension."
 		raw_input()
 	Facet.Dimension = Dim
 	Facet.Neighbors = []
 	return Facet, PointsToRemove, Edges
-
+	
 	
 for k in range(20):
 	print ""
@@ -189,6 +194,8 @@ for i in [0,1,2]:
 TetrahedronExtraPts = [[1,1,1], [1,-1,-1], [-1,1,-1], [-1,-1,1],[0,0,0],[1,0,0]]
 Tetrahedron = [[1,1,1], [1,-1,-1], [-1,1,-1], [-1,-1,1]]
 TippedOverHouse = [[0,0,0],[2,0,0],[0,2,0],[2,2,0],[0,0,2],[2,0,2],[0,2,2],[2,2,2],[3,1,1]]
+FiveDCube = [[1,0,0,0,0],[1,1,0,0,1],[1,0,1,0,0],[1,1,1,0,1],[1,0,0,1,0],[1,1,0,1,1],[1,0,1,1,0],[1,1,1,1,1]]
+
 Tests = [(TestCube,'Cube'), (Tetrahedron,'Tetrahedron'),(TippedOverHouse,'TippedOverHouse'),(TetrahedronExtraPts,'TetrahedronExtraPts'),(BigCube,'BigCube')]
 
 def MakeRandomPointSet():
@@ -204,7 +211,8 @@ for i in xrange(5000):
 	Tests.append((MakeRandomPointSet(), 'Random'))
 
 #Tests = [(TestCube,'Cube'), (Tetrahedron,'Tetrahedron'),(TippedOverHouse,'TippedOverHouse'),(TetrahedronExtraPts,'TetrahedronExtraPts'),(BigCube,'BigCube')]
-
+#Tests = [(FiveDCube,'3d Cube in 5d'), (TestCube,'Cube')]
+#Tests = [(TestCube,'Cube')]
 for Test in Tests:
 	Pts = Test[0]
 	print Test[1]

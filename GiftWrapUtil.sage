@@ -175,16 +175,6 @@ def NormalPointsTowardsPt(Normal, Barycenter, Pt):
 
 #-------------------------------------------------------------------------------
 def FindNewFacetPts(Pts, Edge, Normal, KnownFacetPts, NormalThroughFacet):
-	def DistanceBetweenPts(Pt1, Pt2):
-		D = 0
-		for i in xrange(len(Pt1)):
-			D += (Pt1[i] - Pt2[i])^2
-		return D
-	def PtPlusVector(Vector, Pt):
-		NewPt = []
-		for i in xrange(len(Pt)):
-			NewPt.append(Pt[i] + Vector[i])
-		return NewPt
 	FacetBarycenter = FindBarycenter(KnownFacetPts)
 	# Note that the smallest angle will have the largest cot(theta). We are trying
 	# to find all of the points where the angle is maximized, because these points
@@ -197,13 +187,7 @@ def FindNewFacetPts(Pts, Edge, Normal, KnownFacetPts, NormalThroughFacet):
 			if n(DotProduct(Vector, Normal),1000) == 0:
 				print "Denominator == 0!"
 				raw_input()
-			if DotProduct(NormalThroughFacet, Vector) > 0:
-				TestTheta = Rational(Integer(DotProduct(Vector, NormalThroughFacet))/Integer(DotProduct(Vector, Normal)))
-				Angle = - TestTheta
-			else:
-				NegativeNormalThroughFacet = [-NormalThroughFacet[i] for i in xrange(len(NormalThroughFacet))]
-				TestTheta = Rational(Integer(DotProduct(Vector, NegativeNormalThroughFacet))/Integer(DotProduct(Vector, Normal)))
-				Angle = TestTheta
+			Angle = - Rational(Integer(DotProduct(Vector, NormalThroughFacet))/Integer(DotProduct(Vector, Normal)))
 			if MaxAngle == 'Test':
 				MaxAngle = Angle
 				NewFacetPts = [Pt]

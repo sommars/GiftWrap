@@ -109,6 +109,27 @@ def GetHNFFromVectorAndPts(Vector, Pts):
 	return ConvertMatrixToList(HNFMatrix)
 
 #-------------------------------------------------------------------------------
+def GetHNFFromVectors(Vectors):
+	# Instead of thinking about these as points, we should think about these as
+	# being vectors.
+	def ConvertMatrixToList(Matrix):
+		Pts = []
+		for Row in Matrix:
+			Pts.append(list(Row))
+		return Pts
+	HNFMatrix = (matrix(Vectors)).echelon_form(include_zero_rows = False)
+	return ConvertMatrixToList(HNFMatrix)
+
+#-------------------------------------------------------------------------------
+def GetNormalFromNonIntVectors(Vectors):
+	LE = len(Matrix(Vectors).echelon_form().transpose().kernel().gens())
+	#if LE > 1:
+	#	L1 = Matrix(Vectors).echelon_form().transpose().kernel().gens()[0]
+	#	L2 = Matrix(Vectors).echelon_form().transpose().kernel().gens()[1]
+	#	return [L1[i] + L2[i] for i in xrange(len(L1))]
+	return list(Matrix(Vectors).echelon_form().transpose().kernel().gens()[0])
+
+#-------------------------------------------------------------------------------
 def GetNormalFromHNF(HNF):
 	M = matrix(HNF)
 	HNF = []
@@ -172,7 +193,44 @@ def NormalPointsTowardsPt(Normal, Barycenter, Pt):
 	elif NegNormalDistance < NormalDistance:
 		return False
 	return
-
+#-------------------------------------------------------------------------------
+def FindNewFacetPtsGood(Pts, Edge, Normal, KnownFacetPts, NormalThroughFacet):
+	FacetBarycenter = FindBarycenter(KnownFacetPts)
+	# Note that the smallest angle will have the largest cot(theta). We are trying
+	# to find all of the points where the angle is maximized, because these points
+	# are the points on the new facet.
+	MaxAngle = 'Test'
+	NewFacetPts = []
+	"""
+	for i in xrange(len(Normal)):
+		Normal[i] = Integer(Normal[i])
+	for i in xrange(len(NormalThroughFacet)):
+		NormalThroughFacet[i] = Integer(NormalThroughFacet[i])
+	"""
+	#Normal = MakeExactUnitVector(Normal)
+	#NormalThroughFacet = MakeExactUnitVector(NormalThroughFacet)
+	for Pt in Pts:
+		if Pt not in KnownFacetPts:
+			Vector = MakeVector(Edge[0], Pt)
+			if n(DotProduct(Vector, Normal),1000) == 0:
+				print "Denominator == 0!"
+				raw_input()
+			Angle = - DotProduct(Vector, NormalThroughFacet)/DotProduct(Vector, Normal)
+			if MaxAngle == 'Test':
+				MaxAngle = Angle
+				NewFacetPts = [Pt]
+				Num = DotProduct(Vector, NormalThroughFacet)
+				Denom = DotProduct(Vector, Normal)
+			else: 
+				if Angle < MaxAngle:
+					MaxAngle = Angle
+					NewFacetPts = [Pt]
+					Num = DotProduct(Vector, NormalThroughFacet)
+					Denom = DotProduct(Vector, Normal)
+				elif Angle == MaxAngle:
+					NewFacetPts.append(Pt)
+	return NewFacetPts, Num, Denom
+	
 #-------------------------------------------------------------------------------
 def FindNewFacetPts(Pts, Edge, Normal, KnownFacetPts, NormalThroughFacet):
 	FacetBarycenter = FindBarycenter(KnownFacetPts)
@@ -181,13 +239,69 @@ def FindNewFacetPts(Pts, Edge, Normal, KnownFacetPts, NormalThroughFacet):
 	# are the points on the new facet.
 	MaxAngle = 'Test'
 	NewFacetPts = []
+	"""
+	for i in xrange(len(Normal)):
+		Normal[i] = Integer(Normal[i])
+	for i in xrange(len(NormalThroughFacet)):
+		NormalThroughFacet[i] = Integer(NormalThroughFacet[i])
+	"""
+	#Normal = MakeExactUnitVector(Normal)
+	#NormalThroughFacet = MakeExactUnitVector(NormalThroughFacet)
 	for Pt in Pts:
 		if Pt not in KnownFacetPts:
 			Vector = MakeVector(Edge[0], Pt)
+			#print DotProduct(Vector, NormalThroughFacet)
+			#print DotProduct(Vector, Normal)
+			#print DotProduct(Vector, NormalThroughFacet)/DotProduct(Vector, Normal)
 			if n(DotProduct(Vector, Normal),1000) == 0:
 				print "Denominator == 0!"
 				raw_input()
-			Angle = - Rational(Integer(DotProduct(Vector, NormalThroughFacet))/Integer(DotProduct(Vector, Normal)))
+			Angle = - DotProduct(Vector, NormalThroughFacet)/DotProduct(Vector, Normal)
+			if MaxAngle == 'Test':
+				MaxAngle = Angle
+				NewFacetPts = [Pt]
+				Num = DotProduct(Vector, NormalThroughFacet)
+				Denom = DotProduct(Vector, Normal)
+			else: 
+				if Angle < MaxAngle:
+					MaxAngle = Angle
+					NewFacetPts = [Pt]
+				elif Angle == MaxAngle:
+					NewFacetPts.append(Pt)
+	return NewFacetPts
+	
+#-------------------------------------------------------------------------------
+def FindNewFacetPtsTwo(Pts, Edge, Normal, KnownFacetPts, NormalThroughFacet):
+	FacetBarycenter = FindBarycenter(KnownFacetPts)
+	# Note that the smallest angle will have the largest cot(theta). We are trying
+	# to find all of the points where the angle is maximized, because these points
+	# are the points on the new facet.
+	MaxAngle = 'Test'
+	NewFacetPts = []
+	"""
+	for i in xrange(len(Normal)):
+		Normal[i] = Integer(Normal[i])
+	for i in xrange(len(NormalThroughFacet)):
+		NormalThroughFacet[i] = Integer(NormalThroughFacet[i])
+	"""
+	Normal = MakeExactUnitVector(Normal)
+	NormalThroughFacet = MakeExactUnitVector(NormalThroughFacet)
+	for Pt in Pts:
+		if Pt not in KnownFacetPts:
+			Vector = MakeVector(Edge[0], Pt)
+			#print DotProduct(Vector, NormalThroughFacet)
+			#print DotProduct(Vector, Normal)
+			#print DotProduct(Vector, NormalThroughFacet)/DotProduct(Vector, Normal)
+			if n(DotProduct(Vector, Normal),1000) == 0:
+				print "Denominator == 0!"
+				raw_input()
+			if DotProduct(NormalThroughFacet, Vector) > 0:
+				TestTheta = DotProduct(Vector, NormalThroughFacet)/DotProduct(Vector, Normal)
+				Angle = - TestTheta
+			else:
+				NegativeNormalThroughFacet = [-NormalThroughFacet[i] for i in xrange(len(NormalThroughFacet))]
+				TestTheta = DotProduct(Vector, NegativeNormalThroughFacet)/DotProduct(Vector, Normal)
+				Angle = TestTheta
 			if MaxAngle == 'Test':
 				MaxAngle = Angle
 				NewFacetPts = [Pt]
@@ -197,7 +311,7 @@ def FindNewFacetPts(Pts, Edge, Normal, KnownFacetPts, NormalThroughFacet):
 					NewFacetPts = [Pt]
 				elif Angle == MaxAngle:
 					NewFacetPts.append(Pt)
-	return NewFacetPts
+	return NewFacetPts, (MaxAngle.numerator(), MaxAngle.denominator())
 
 #-------------------------------------------------------------------------------
 def FindNewFacetPtsFromEdge(Pts, Edge, Normal, KnownFacetPts):
@@ -318,3 +432,79 @@ def PutFacetsInCorrectDimension(Facets, PointMap, Barycenter):
 			Normal = [-Normal[i] for i in xrange(len(Normal))]
 		Facet.InnerNormal = Normal
 	return Facets
+	
+#-------------------------------------------------------------------------------
+def MakeExactUnitVector(Vector):
+	UnitVector = []
+	Sum = 0
+	for i in Vector:
+		Sum += i^2
+	ScaleFactor = sqrt(Sum)
+	if ScaleFactor == 0 or ScaleFactor == 1:
+		return Vector
+	elif ScaleFactor == -1:
+		return [-Vector[i] for i in xrange(len(Vector))]
+	return [Vector[i]/ScaleFactor for i in xrange(len(Vector))]
+
+#-------------------------------------------------------------------------------
+def CheckFacetAgainstSage(Pts, PtsInFacet):
+	Pts.sort()
+	PtsInFacet.sort()
+	Polytope = Polyhedron(vertices = Pts)
+	Facet = Polyhedron(vertices = PtsInFacet)
+	FacetList = list(Facet.face_lattice()[-1].ambient_Vrepresentation())
+	for i in xrange(len(Polytope.face_lattice())):
+		TestFace = list(Polytope.face_lattice()[i].ambient_Vrepresentation())
+		TestFace.sort()
+		if TestFace == FacetList:
+			print "You found the points in an initial facet"
+			return
+	print "Pts you thought made a facet", PtsInFacet
+	raw_input()
+	return
+
+#-------------------------------------------------------------------------------
+def FindInitialFacet(Pts, Barycenter):
+	# Not sure if I ever need the Barycenter. requires some more testing...
+	def ScaleNumAndDenom(Num, Denom):
+		C = Num^2+Denom^2
+		return Num/sqrt(C), Denom/sqrt(C)
+	def FindFirstPts(Pts):
+		# Just sorting the points
+		FirstPts = []
+		FirstPtValue = Pts[0][0]
+		for Pt in Pts:
+			if Pt[0] == FirstPtValue:
+				FirstPts.append(Pt)
+			if Pt[0] > FirstPtValue:
+				FirstPts = [Pt]
+				FirstPtValue = Pt[0]
+		return FirstPts
+	FirstPts = FindFirstPts(Pts)
+	Normal = [-1 if i == 0 else 0 for i in xrange(len(Pts[0]))]
+	Axes = []
+	for i in xrange(2,len(Pts[0])):
+		Axes.append([1 if j == i else 0 for j in xrange(len(Pts[0]))])
+	while True:
+		Dim = CheckNormalFormDim(GetHNF(FirstPts))
+		if Dim == len(Pts[0]) - 1:
+			break
+		ListForNormalThroughFacet = [Normal]
+		for i in xrange(1, len(FirstPts)):
+			ListForNormalThroughFacet.append(MakeVector(FirstPts[0], FirstPts[i]))
+		if len(FirstPts) == 1:
+			Dim = 0
+		for i in xrange(Dim, len(Axes)):
+			ListForNormalThroughFacet.append(Axes[i])
+		NormalThroughFacet = MakeExactUnitVector(GetNormalFromNonIntVectors(ListForNormalThroughFacet))
+		NewPts, Num, Denom = FindNewFacetPtsGood(Pts, FirstPts, Normal, FirstPts, NormalThroughFacet)
+		Num, Denom = ScaleNumAndDenom(Num, Denom)
+		FirstPts = NewPts + FirstPts
+		PreviousNormal = copy(Normal)
+		Normal = [-NormalThroughFacet[i]*Denom + Normal[i]*Num for i in xrange(len(Normal))]
+		if not NormalPointsTowardsPt(Normal, Barycenter, FirstPts[0]):
+			print "FLIP NORMAL"
+			raw_input()
+			Normal = [-Normal[i] for i in xrange(len(Normal))]
+	CheckFacetAgainstSage(Pts, FirstPts)
+	return FirstPts

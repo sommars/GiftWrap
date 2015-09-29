@@ -11,5 +11,6 @@ class Face:
 		print "Below is a face of dimension " , self.Dimension
 		print "InnerNormal = " , self.InnerNormal
 		print "Vertices = ", self.Vertices
+		print "Dimension = ", self.Dimension
 		print ""
 		return

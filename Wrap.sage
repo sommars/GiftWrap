@@ -13,7 +13,8 @@ def GiftWrap(Pts):
 	if InitialDim != 3:
 		print "This set of point is not full dimensional"
 		return
-	InitialFacet, PtsToRemove, EdgeList = FindInitialFacet(Pts)
+	FirstPts = FindInitialFacet(Pts, Barycenter)
+	InitialFacet, PtsToRemove, EdgeList = MakeFacet(FirstPts, Pts)
 	Facets.append(InitialFacet)
 	Pts = RemovePts(Pts, PtsToRemove)
 	# Going to spin through all of the edges in edgelist.
@@ -74,75 +75,6 @@ def GiftWrap(Pts):
 	return Facets
 
 #-------------------------------------------------------------------------------
-def FindInitialFacet(Pts):
-	def FindFirstPts(Pts):
-		# Just sorting the points
-		FirstPts = []
-		FirstPtValue = Pts[0][0]
-		for Pt in Pts:
-			if Pt[0] == FirstPtValue:
-				FirstPts.append(Pt)
-			if Pt[0] > FirstPtValue:
-				FirstPts = [Pt]
-				FirstPtValue = Pt[0]
-		return FirstPts
-	FirstPts = FindFirstPts(Pts)
-
-	if len(FirstPts) == 1:
-		#Start with one point
-		FirstPts = FirstPts + FindNewFacetPtsFromSinglePt(Pts, FirstPts)
-
-		# Now we have either an edge or a facet. Need to check which via a dimension calculation
-		if CheckNormalFormDim(GetHNF(FirstPts)) == 2:
-			return MakeFacet(FirstPts, Pts)
-
-		# Here I manufacture a point to create a fake facet. This allows me to
-		# have a valid pair of normals, though they aren't ultimately meaningful
-		# to the final convex hull
-		KnownFacetPts = list(FirstPts)
-		NewPoint = [FirstPts[0][0],FirstPts[0][1]+1,FirstPts[0][2]]
-		if not NewPoint in KnownFacetPts:
-			KnownFacetPts.append(NewPoint)
-		InnerNormal = GetNormalFromHNF(GetHNF(KnownFacetPts))
-		if not NormalPointsTowardsPt(InnerNormal, Barycenter, FirstPts[0]):
-			InnerNormal = [-InnerNormal[i] for i in xrange(len(InnerNormal))]
-		# Not sure why the integer calls below are necessary. Need to look into that
-		for i in xrange(len(InnerNormal)):
-			InnerNormal[i] = Integer(InnerNormal[i])
-
-		FirstPts = FirstPts + FindNewFacetPtsFromEdge(Pts, FirstPts, InnerNormal, KnownFacetPts)
-		return MakeFacet(FirstPts, Pts)		
-	else:
-		HNF = GetHNF(FirstPts)
-		Dim = CheckNormalFormDim(HNF)
-		# This is the case in which I immediately find a facet in vertical position
-		if Dim == 2:
-			return MakeFacet(FirstPts, Pts)
-
-		# I have found an edge. I can do roughly the same thing I do in the general
-		# situation. I have the same normal to the hyperplane [-1,0,0]. 
-		# I must use a specific normal to the point set
-		elif Dim == 1:
-			Normal = [-1,0,0]
-			
-			# This is a way to manufacture a third point on the facet.
-			KnownFacetPts = list(FirstPts)
-			ExtraPt = [0 for i in xrange(len(FirstPts[0]))]
-			ExtraPt[0] = FirstPts[0][0]
-			for Pt in KnownFacetPts:
-				for i in xrange(1,len(Pt)):
-					ExtraPt[i] += abs(Pt[i])
-			KnownFacetPts.append(ExtraPt)
-			
-			FirstPts = FirstPts + FindNewFacetPtsFromEdge(Pts, FirstPts, [-1,0,0], KnownFacetPts)
-			return MakeFacet(FirstPts, Pts)
-		else:
-			print "Internal error, unexpected dimension = ", Dim
-			raw_input()
-			return
-	return MakeFacet(FirstPts, Pts)
-
-#-------------------------------------------------------------------------------
 def MakeFacet(FacetPts, Pts):
 	# We have all of the points in their general position. We need to bring them
 	# into vertical position so that the convexhull algorithm can work.
@@ -200,23 +132,43 @@ Tests = [(TestCube,'Cube'), (Tetrahedron,'Tetrahedron'),(TippedOverHouse,'Tipped
 
 def MakeRandomPointSet():
 	Pts = []
-	for i in xrange(randint(4,100)):
+	for i in xrange(randint(20,20)):
 		Pts.append([])
 		for j in xrange(3):
 			Pts[i].append(Integer(randint(0,100)))
 	return Pts
 
 Tests = []
-for i in xrange(5000):
+for i in xrange(100):
 	Tests.append((MakeRandomPointSet(), 'Random'))
 
 #Tests = [(TestCube,'Cube'), (Tetrahedron,'Tetrahedron'),(TippedOverHouse,'TippedOverHouse'),(TetrahedronExtraPts,'TetrahedronExtraPts'),(BigCube,'BigCube')]
 #Tests = [(FiveDCube,'3d Cube in 5d'), (TestCube,'Cube')]
 #Tests = [(TestCube,'Cube')]
+#Tests = [(TippedOverHouse,'TippedOverHouse')]#,(Tetrahedron,'Tetrahedron')]
+#Tetrahedron = [[46, 64, 38], [68, 70, 19], [18, 97, 28], [20, 73, 66], [16, 81, 27], [37, 1, 16], [98, 25, 33], [29, 45, 45], [100, 19, 5], [83, 22, 68], [50, 95, 92], [62, 66, 33], [47, 48, 93], [82, 46, 41], [10, 13, 26], [53, 49, 51], [53, 74, 75]]
+#Tests = [(Tetrahedron,'Tetrahedron')]
+
+#ZZZZ = [[33, 36, 82], [7, 49, 16], [70, 95, 85], [41, 57, 43], [94, 99, 1], [91, 14, 69], [68, 6, 13], [33, 58, 53], [35, 24, 75], [75, 64, 79], [3, 80, 87]]
+#ZZZZ = [[13, 18, 70], [68, 89, 61], [51, 1, 37], [37, 9, 88], [57, 56, 62], [77, 12, 58], [57, 4, 79], [39, 25, 33], [58, 57, 33], [59, 12, 94], [56, 35, 91], [90, 14, 38], [20, 19, 96], [87, 97, 15], [59, 49, 12], [14, 72, 4], [39, 93, 48]]
+
+
+
+#ZZZZ = [[73, 50, 48], [7, 10, 66], [38, 62, 3], [38, 99, 3]]
+#ZZZZ = [[59, 36, 7], [14, 95, 33], [70, 31, 33], [68, 6, 20]]
+#ZZZZ = [[36, 31, 60, 94], [67, 29, 42, 63], [69, 94, 18, 61], [85, 30, 71, 100], [95, 2, 41, 99], [3, 28, 40, 79], [12, 83, 24, 22], [20, 53, 43, 95], [25, 81, 3, 84], [13, 85, 56, 61], [34, 76, 32, 55], [65, 22, 64, 52], [19, 39, 85, 72], [88, 71, 100, 95], [88, 85, 76, 59], [40, 41, 22, 87], [38, 2, 8, 91], [71, 43, 9, 50], [30, 8, 75, 62], [9, 68, 29, 14]]
+#ZZZZ = [[65, 44, 65, 49], [38, 92, 47, 13], [33, 44, 95, 84], [56, 75, 7, 75], [98, 72, 95, 97], [82, 90, 4, 22], [79, 60, 86, 52], [52, 95, 33, 47], [17, 7, 98, 71], [18, 1, 70, 57], [37, 85, 52, 69], [95, 80, 65, 2], [93, 49, 77, 80], [66, 86, 29, 91], [75, 64, 12, 97], [100, 0, 15, 9], [99, 74, 98, 90], [42, 86, 36, 94], [55, 8, 21, 57], [73, 16, 34, 43]]
+#ZZZZ = [[35, 82, 69, 28], [68, 52, 41, 90], [97, 66, 25, 58], [43, 63, 69, 5], [28, 14, 17, 1], [62, 48, 67, 91], [46, 73, 51, 25], [84, 55, 6, 81], [84, 43, 2, 58], [86, 62, 49, 21], [17, 76, 74, 16], [7, 20, 81, 57], [65, 9, 2, 4], [37, 44, 62, 5], [23, 65, 3, 78], [20, 65, 11, 67], [61, 16, 48, 13], [84, 64, 34, 74], [25, 77, 13, 26], [22, 61, 22, 17]]
+#ZZZZ = [[91, 41, 53, 62], [78, 84, 59, 48], [37, 0, 17, 48], [88, 58, 34, 58], [22, 79, 20, 13], [80, 19, 33, 62], [94, 23, 9, 97], [85, 99, 79, 94], [93, 69, 57, 86], [17, 96, 21, 22], [87, 33, 5, 78], [68, 64, 33, 93], [45, 84, 53, 66], [98, 91, 99, 39], [95, 72, 65, 5], [14, 26, 83, 95], [11, 28, 84, 40], [56, 34, 50, 44], [78, 100, 35, 49], [49, 92, 56, 17]]
+#ZZZZ = [[71, 31, 69, 68], [26, 76, 33, 71], [6, 67, 83, 30], [5, 79, 20, 3], [10, 10, 93, 88], [85, 31, 34, 5], [92, 28, 33, 91], [44, 97, 2, 19], [94, 0, 46, 39], [78, 88, 90, 37], [67, 98, 88, 61], [74, 75, 57, 39], [57, 62, 39, 7], [25, 41, 9, 93], [31, 21, 70, 19], [5, 69, 4, 68], [74, 11, 95, 2], [44, 19, 42, 22], [88, 12, 22, 30], [40, 95, 83, 64]]
+#ZZZZ = [[53, 86, 37, 87], [7, 92, 13, 99], [96, 18, 61, 25], [62, 42, 81, 86], [11, 35, 89, 95], [65, 44, 75, 21], [55, 25, 71, 70], [100, 97, 99, 71], [31, 89, 95, 65], [1, 35, 24, 5], [51, 61, 6, 45], [100, 77, 81, 35], [90, 93, 58, 80], [82, 26, 49, 52], [99, 28, 95, 34], [68, 83, 8, 20], [40, 16, 64, 18], [15, 57, 27, 16], [19, 20, 43, 74], [58, 23, 32, 44]]
+#Tests = [(ZZZZ, 'ZZZZ')]
+
 for Test in Tests:
 	Pts = Test[0]
 	print Test[1]
 	print Pts
+	#FindInitialFacet(Pts)
 	GiftWrap(Pts)
 	print "Done with " + Test[1]
 	print ""

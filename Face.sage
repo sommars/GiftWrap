@@ -12,5 +12,8 @@ class Face:
 		print "InnerNormal = " , self.InnerNormal
 		print "Vertices = ", self.Vertices
 		print "Dimension = ", self.Dimension
+		print "Neighbors = ", self.Neighbors
+		print "Parents = ", self.Parents
+		print "Children = ", self.Children
 		print ""
 		return

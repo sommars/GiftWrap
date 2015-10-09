@@ -1,176 +1,312 @@
+global Faces
+Faces = "Start"
+global PointToIndexMap
+PointToIndexMap = "Start"
+global InitialDim
+InitialDim = "Sentinel"
+global AllPts
 load("GiftUtil.sage")
 # The code in this unit is the code that will have to change for going between 3 and n dimensions.
+
+#If all of the points have a column that's identical, this will break. I should immediately make a map in that case..?
 def GiftWrap(Pts):
-	Facets = []
+	global Faces
+	global InitialDim
+	global PointToIndexMap
+	global IndexToPointMap
+	global Barycenter
+	global AllPts
 	if not PtsAreValid(Pts):
-		return "The input set of points is not valid."
+		print "The input set of points is not valid."
+		raw_input()
+		return
 	Pts = RemoveDups(Pts)
 	OriginalBarycenter = FindBarycenter(Pts)
-	global InitialDim
-	Pts, PointMap, InitialDim = MakePointMap(Pts)
-	global Barycenter
+	if PointToIndexMap == "Start":
+		AllPts = Pts
+	Pts, ShortPointToLongPointMap, LongPointToShortPointMap, LocalDim = WrapMaps(AllPts, Pts)
+	if PointToIndexMap == "Start":
+		PointToIndexMap, IndexToPointMap = MakeIndexMaps(Pts)
+		InitialDim = LocalDim
+		AllPts = Pts
+	if Faces == "Start":
+		Faces = []
+		for Dim in xrange(1,len(Pts[0])):
+			Faces.append([])
 	Barycenter = FindBarycenter(Pts)
-	if InitialDim != 3:
-		print "This set of point is not full dimensional"
-		return
-	FirstPts = FindInitialFacet(Pts, Barycenter)
-	InitialFacet, PtsToRemove, EdgeList = MakeFacet(FirstPts, Pts)
-	Facets.append(InitialFacet)
-	Pts = RemovePts(Pts, PtsToRemove)
-	# Going to spin through all of the edges in edgelist.
-	# EdgeList should really be done via sets.
+	FirstPts = FindInitialFacet(Pts)
+	IndexOfFirstFace = MakeFace(FirstPts, Pts, LongPointToShortPointMap, ShortPointToLongPointMap)
+	FaceIndices = [IndexOfFirstFace]
 	Counter = 0
-	while len(EdgeList) > 0:
-		Edge = EdgeList[0]
-		#Find Facet that has this Edge
-		
-		for Facet in Facets:
-			Vertices = Facet.Vertices
-			if (Edge[0] in Vertices) and (Edge[1] in Vertices):
-				break
+	EdgesToRotateOver = set([])
+	for ChildEdge in Faces[LocalDim-2][IndexOfFirstFace].Children:
+		EdgesToRotateOver.add((IndexOfFirstFace, ChildEdge))
+	while len(EdgesToRotateOver) > 0:
+		if LocalDim == 4:
+			print EdgesToRotateOver
+		Edge = EdgesToRotateOver.pop()
+		FaceWithEdge = Faces[LocalDim-2][Edge[0]]
+		ChildFace = Faces[LocalDim-3][Edge[1]]
+
 
 		Counter += 1
 		if Counter == 200:
-			return
+			print "Internal error, computation time exceeded"
+			print len(Faces[0])
+			print len(Faces[1])
+			#PrintFaces()
 			raw_input()
-		FacetPts = Edge + FindNewFacetPtsFromEdge(Pts, Edge, Facet.InnerNormal, Facet.Vertices)[0]
 
+		VerticesToUse = []
+		for Vertex in FaceWithEdge.Vertices:
+			VerticesToUse.append(LongPointToShortPointMap[tuple(IndexToPointMap[Vertex])])
+
+
+		EdgePts = []
+		for Vertex in ChildFace.Vertices:
+			EdgePts.append(LongPointToShortPointMap[tuple(IndexToPointMap[Vertex])])
+		Normal = GetNormalFromHNF(GetHNF(VerticesToUse))
+		# Need to make the normal an inner normal
+		if not NormalPointsTowardsPt(Normal, Barycenter, VerticesToUse[0]):
+			Normal = [-Normal[i] for i in xrange(len(Normal))]
+		InnerNormal = Normal
+		FacePts = EdgePts + FindNewFacetPtsFromEdge(Pts, EdgePts, InnerNormal, VerticesToUse)[0]
 		#Call MakeFacet on the points I've found and do some bookkeeping
-		Facet, PtsToRemove, Edges = MakeFacet(FacetPts, Pts)
+		NewFaceIndex = MakeFace(FacePts, Pts, LongPointToShortPointMap, ShortPointToLongPointMap)
+		if NewFaceIndex not in FaceIndices:
+			EdgesToRotateOver.add(Edge)
+			FaceIndices.append(NewFaceIndex)
 
-		Pts = RemovePts(Pts, PtsToRemove)
+			#Note that a Neighbor = (Neighbor, ChildFaceShared)
+			for ChildEdge in Faces[LocalDim-2][NewFaceIndex].Children:
+				ShouldBreak = False
+				for Index in FaceIndices:
+					if ShouldBreak == True:
+						break
+					Face = Faces[LocalDim-2][Index]
+					for Neighbor in Face.Neighbors:
+						if (Neighbor[1] == ChildEdge) and (Neighbor[0] == NewFaceIndex):
+							if (Index, ChildEdge) in EdgesToRotateOver:
+								EdgesToRotateOver.remove((Index, ChildEdge))
+								ShouldBreak = True
+								break
+				if ShouldBreak == False:
+					EdgesToRotateOver.add((NewFaceIndex,ChildEdge))
 
-		for Edge in Edges:
-			# This is hacky. Really should just be careful and do some sorting
-			ReversedEdge = [Edge[1], Edge[0]]
-			if Edge in EdgeList:
-				EdgeList.remove(Edge)
-			elif ReversedEdge in EdgeList:
-				EdgeList.remove(ReversedEdge)
-			else:
-				EdgeList.append(Edge)
-		Facets.append(Facet)
+	Vertices = set([])
+	for Index in FaceIndices:
+		Vertices = Vertices.union(Faces[LocalDim - 2][Index].Vertices)
 
-	# If there are any points sitting in the interior of our polytope then they
-	# have not yet been removed. We do so now. This is lazily programmed, and will
-	# be fixed in the future.
-	InteriorPts = list(Pts)
-	for Facet in Facets:
-		for Vertex in Facet.Vertices:
-			if Vertex in InteriorPts:
-				InteriorPts.remove(Vertex)
-	Pts = RemovePts(Pts, InteriorPts)
-	Facets = PutFacetsInCorrectDimension(Facets, PointMap, OriginalBarycenter)
-	# Euler Characteristic check
-	EdgeCount = 0
-	for Facet in Facets:
-		EdgeCount += len(Facet.Vertices)
-	# We don't want to double count edges
-	EdgeCount = EdgeCount/2
-	if len(Pts) - EdgeCount + len(Facets) != 2:
-		print "Euler Characteristic failed!"
+	if LocalDim%2 == 0:
+		Goal = 0
+	else:
+		Goal = 2
+
+	FaceSum = 0
+	SubFaces = set(FaceIndices)
+	LenList = [0 for i in xrange(LocalDim - 1)]
+	for MyDim in xrange(LocalDim - 1):
+		NextSubFaces = set([])
+		CurDim = LocalDim - MyDim - 2
+		for Index in SubFaces:
+			NextSubFaces = NextSubFaces.union(Faces[CurDim][Index].Children)
+		FaceSum += (-1)^(CurDim+1)*len(SubFaces)
+		LenList[CurDim] = (-1)^(CurDim+1)*len(SubFaces)
+		SubFaces = NextSubFaces
+	if len(Vertices) + FaceSum != Goal:
+		print "Euler characteristic failed for polytope that lives in dimension", LocalDim
+		print "len(Vertices) = ", len(Vertices)
+		for i in xrange(len(Faces)):
+			print "Length of Faces[", i, "] is equal to", LenList[i]
+		print "Goal", Goal
+		#PrintFaces()
+		#for i in xrange(len(Faces[1])):
+		#	print Faces[1][i].Vertices
 		raw_input()
-	# Note that in 4d it would be if len(Pts) - EdgeCount + len(3faces) - len(4faces) != 0:
-	# In general, it's F_0 - F_1 + F_2 .... F_N != 1 + (-1)^(N+1)
-	return Facets
+	#else:
+		#print "Euler characteristic passed for polytope that lives in dimension", LocalDim
+	if InitialDim == LocalDim:
+		print "Euler characteristic passed for polytope that lives in dimension", LocalDim
+		return 
+	return FaceIndices
 
 #-------------------------------------------------------------------------------
-def MakeFacet(FacetPts, Pts):
-	# We have all of the points in their general position. We need to bring them
-	# into vertical position so that the convexhull algorithm can work.
-	UCT = GetUCTAndNormal(GetNormalFromHNF(GetHNF(FacetPts)))[0]
-	ShiftedFacetPts = TransformPts(FacetPts, UCT)
-	Hull, PointsToRemove = ConvexHull2d(ShiftedFacetPts)
-	
-	# We want to make sure the hyperplane supporting the facet is to one side
-	# of all of the points.
-	CheckAllPtsLieOnOthersideOfFacetHyperplane(copy(Pts), copy(ShiftedFacetPts), UCT)
-
+def Make2dFace(FacePts, Pts, LongPointToShortPointMap, ShortPointToLongPointMap):
+	UCT = GetUCTAndNormal(GetNormalFromHNF(GetHNF(FacePts)))[0]
+	ShiftedFacePts = TransformPts(FacePts, UCT)
+	# I don't really need to remove points like this. I can just wait til the end and knock them off.
+	Hull, PointsToRemove = ConvexHull2d(ShiftedFacePts)
 	Hull = TransformPts(Hull, matrix(UCT^-1, ZZ))
-	
-	#Hate doing this. Not sure why it's necessary, but this is a temporary solution
-	for i in xrange(len(Hull)):
-		for j in xrange(len(Hull[i])):
-			Hull[i][j] = Integer(Hull[i][j])
 
-	PointsToRemove = TransformPts(PointsToRemove, matrix(UCT^-1, ZZ))
-	Facet = Face()
-
+	NewFace = Face()
 	Normal = GetNormalFromHNF(GetHNF(Hull))
 	# Need to make the normal an inner normal
 	if not NormalPointsTowardsPt(Normal, Barycenter, Hull[0]):
 		Normal = [-Normal[i] for i in xrange(len(Normal))]
-	Facet.InnerNormal = Normal
+	NewFace.InnerNormal = Normal
 	Edges = [[Hull[len(Hull) - 1], Hull[0]]]
 	for i in xrange(len(Hull) - 1):
 		Edges.append([Hull[i],Hull[i+1]])
-	Facet.Vertices = Hull
-	Facet.Children = Hull
-	Dim = CheckNormalFormDim(GetHNF(Hull))
-	if Dim != 2:
-		print "Internal error, 2d convex hull is in the wrong dimension."
+
+	NewFace.Vertices = set()
+	for Pt in Hull:
+		NewFace.Vertices.add(PointToIndexMap[tuple(Pt)])
+
+	Children = set([])
+	for i in xrange(len(Hull)):
+		EdgeFound = False
+		Pt1 = PointToIndexMap[tuple(Hull[i])]
+		Pt2 = PointToIndexMap[tuple(Hull[(i+1)%len(Hull)])]
+		Edge = set([Pt1, Pt2])
+		for i in xrange(len(Faces[0])):
+			if Faces[0][i].Vertices == Edge:
+				Children.add(i)
+				EdgeFound = True
+				break
+		if EdgeFound == False:
+			EdgeFace = Face()
+			EdgeFace.Dimension = 1
+			EdgeFace.Vertices = Edge
+			Faces[0].append(EdgeFace)
+			Children.add(len(Faces[0])-1)
+			EdgeFace.Neighbors = set([])
+			for i in xrange(len(Faces[0])):
+				PossibleNeighbor = Faces[0][i]
+				if len(PossibleNeighbor.Vertices.intersection(EdgeFace.Vertices)) == 1:
+					PossibleNeighbor.Neighbors.add((len(Faces[0])-1,list(PossibleNeighbor.Vertices.intersection(EdgeFace.Vertices))[0]))
+					EdgeFace.Neighbors.add((i,list(PossibleNeighbor.Vertices.intersection(EdgeFace.Vertices))[0]))
+
+	NewFace.Children = Children
+	NewFace.Dimension = 2
+	NewFace.Neighbors = set([])
+	LocationOfNewFace = len(Faces[1])
+	for i in xrange(len(Faces[1])):	
+		PossibleNeighbor = Faces[1][i]
+		Intersection = list(PossibleNeighbor.Children.intersection(NewFace.Children))
+		if len(Intersection) == 1:
+			PossibleNeighbor.Neighbors.add((LocationOfNewFace,Intersection[0]))
+			NewFace.Neighbors.add((i,Intersection[0]))
+		if len(Intersection) > 1:
+			raw_input()
+	Faces[1].append(NewFace)
+	return LocationOfNewFace
+
+#-------------------------------------------------------------------------------
+def PrintFaces():
+	print "BEGIN"
+	print IndexToPointMap
+	for i in xrange(len(Faces)):
+		print ""
+		print ""
+		print ""
+		print "----------------------------------------------"
+		print "Below are faces of dim", i + 1
+		for Face in Faces[i]:
+			Face.PrintProps()
+	print "END"
+	return
+
+#-------------------------------------------------------------------------------
+def MakeFace(FacePts, Pts, LongPointToShortPointMap, ShortPointToLongPointMap):
+	Dimension = CheckNormalFormDim(GetHNF(FacePts))
+
+	#This is to check if it's already been found
+	FacePtsInCorrectDim = []
+	PtIndices = []
+	for Pt in FacePts:
+		LongPt = ShortPointToLongPointMap[tuple(Pt)]
+		FacePtsInCorrectDim.append(LongPt)
+		PtIndices.append(PointToIndexMap[tuple(LongPt)])
+	for i in xrange(len(Faces[Dimension-1])):
+		if len((Faces[Dimension-1][i].Vertices).difference(set(PtIndices))) == 0:
+			return i
+
+
+	if Dimension == 2:
+		return Make2dFace(FacePtsInCorrectDim, Pts, LongPointToShortPointMap, ShortPointToLongPointMap)
+	elif Dimension > 2:
+		NewFace = Face()
+		NewFaceIndex = len(Faces[Dimension-1])
+		NewFace.Children = set(GiftWrap(FacePtsInCorrectDim))
+		NewFace.Vertices = set([])
+		for ChildFaceIndex in NewFace.Children:
+			ChildFace = Faces[Dimension-2][ChildFaceIndex]
+			NewFace.Vertices = NewFace.Vertices.union(ChildFace.Vertices)
+			ChildFace.Parents.append(NewFaceIndex)
+
+		# the below lines should probably be refactored somehow since they show up multiple places
+		# THIS IS GARBAGE. Evidence of bad design
+		VerticesToUse = []
+		for Vertex in NewFace.Vertices:
+			VerticesToUse.append(IndexToPointMap[Vertex])
+
+		Normal = GetNormalFromHNF(GetHNF(VerticesToUse))
+		# Need to make the normal an inner normal
+		if not NormalPointsTowardsPt(Normal, Barycenter, VerticesToUse[0]):
+			Normal = [-Normal[i] for i in xrange(len(Normal))]
+		NewFace.InnerNormal = Normal
+		NewFace.Dimension = Dimension
+
+		# Not entirely sure about this. Simplex vs. Nonsimplex case..?
+		NewFace.Neighbors = set([])
+		for i in xrange(len(Faces[Dimension - 1])):
+			PossibleNeighbor = Faces[Dimension - 1][i]
+			Intersection = list(PossibleNeighbor.Children.intersection(NewFace.Children))
+			if len(Intersection) == 1:
+				PossibleNeighbor.Neighbors.add((NewFaceIndex,Intersection[0]))
+				NewFace.Neighbors.add((i,Intersection[0]))
+			if len(Intersection) > 1:
+				raw_input()
+		Faces[Dimension-1].append(NewFace)
+		IndexOfFace = NewFaceIndex
+	else:
+		print "Internal error, dimension ", dimension, " not expected in MakeFace."
 		raw_input()
-	Facet.Dimension = Dim
-	Facet.Neighbors = []
-	return Facet, PointsToRemove, Edges
-	
-	
+	return IndexOfFace
+
+
 for k in range(20):
 	print ""
-TestCube = [[0,0,0],[1,0,0],[0,1,0],[1,1,0],[0,0,1],[1,0,1],[0,1,1],[1,1,1]]
-BigCube = []
-for i in [0,1,2]:
-	for j in [0,1,2]:
-		for k in [0,1,2]:
-			BigCube.append([i,j,k])
-TetrahedronExtraPts = [[1,1,1], [1,-1,-1], [-1,1,-1], [-1,-1,1],[0,0,0],[1,0,0]]
-Tetrahedron = [[1,1,1], [1,-1,-1], [-1,1,-1], [-1,-1,1]]
-TippedOverHouse = [[0,0,0],[2,0,0],[0,2,0],[2,2,0],[0,0,2],[2,0,2],[0,2,2],[2,2,2],[3,1,1]]
-FiveDCube = [[1,0,0,0,0],[1,1,0,0,1],[1,0,1,0,0],[1,1,1,0,1],[1,0,0,1,0],[1,1,0,1,1],[1,0,1,1,0],[1,1,1,1,1]]
 
-Tests = [(TestCube,'Cube'), (Tetrahedron,'Tetrahedron'),(TippedOverHouse,'TippedOverHouse'),(TetrahedronExtraPts,'TetrahedronExtraPts'),(BigCube,'BigCube')]
-
-def MakeRandomPointSet():
+def MakeRandomPointSet(Dim):
 	Pts = []
 	for i in xrange(randint(20,20)):
 		Pts.append([])
-		for j in xrange(3):
+		for j in xrange(Dim):
 			Pts[i].append(Integer(randint(0,100)))
 	return Pts
 
-Tests = []
-for i in xrange(100):
-	Tests.append((MakeRandomPointSet(), 'Random'))
 
-#Tests = [(TestCube,'Cube'), (Tetrahedron,'Tetrahedron'),(TippedOverHouse,'TippedOverHouse'),(TetrahedronExtraPts,'TetrahedronExtraPts'),(BigCube,'BigCube')]
-#Tests = [(FiveDCube,'3d Cube in 5d'), (TestCube,'Cube')]
-#Tests = [(TestCube,'Cube')]
-#Tests = [(TippedOverHouse,'TippedOverHouse')]#,(Tetrahedron,'Tetrahedron')]
 #Tetrahedron = [[46, 64, 38], [68, 70, 19], [18, 97, 28], [20, 73, 66], [16, 81, 27], [37, 1, 16], [98, 25, 33], [29, 45, 45], [100, 19, 5], [83, 22, 68], [50, 95, 92], [62, 66, 33], [47, 48, 93], [82, 46, 41], [10, 13, 26], [53, 49, 51], [53, 74, 75]]
 #Tests = [(Tetrahedron,'Tetrahedron')]
+#GOTWEIRDBEHAVIORCHECKWHENWORKS[[22, 66, 45, 76], [45, 38, 6, 99], [59, 23, 22, 8], [8, 89, 10, 90], [67, 4, 4, 17], [73, 14, 50, 16], [27, 31, 18, 93], [48, 97, 12, 44], [80, 55, 56, 19], [4, 2, 34, 68], [65, 32, 7, 75], [61, 32, 2, 13], [48, 64, 8, 60], [61, 100, 91, 60], [41, 23, 85, 23], [80, 55, 48, 72], [31, 77, 2, 12], [60, 93, 16, 64], [53, 53, 50, 23], [55, 81, 9, 88]]
 
-#ZZZZ = [[33, 36, 82], [7, 49, 16], [70, 95, 85], [41, 57, 43], [94, 99, 1], [91, 14, 69], [68, 6, 13], [33, 58, 53], [35, 24, 75], [75, 64, 79], [3, 80, 87]]
-#ZZZZ = [[13, 18, 70], [68, 89, 61], [51, 1, 37], [37, 9, 88], [57, 56, 62], [77, 12, 58], [57, 4, 79], [39, 25, 33], [58, 57, 33], [59, 12, 94], [56, 35, 91], [90, 14, 38], [20, 19, 96], [87, 97, 15], [59, 49, 12], [14, 72, 4], [39, 93, 48]]
+ZZZZ = [[47, 13, 48, 92], [8, 25, 69, 8], [85, 25, 75, 5], [86, 67, 96, 64], [95, 58, 89, 73], [17, 0, 35, 31], [100, 80, 81, 33], [63, 90, 11, 35], [71, 49, 85, 77], [60, 99, 25, 38], [66, 93, 44, 18], [84, 57, 58, 70], [19, 20, 76, 57], [1, 8, 87, 61], [82, 62, 53, 57], [82, 31, 8, 80], [51, 66, 0, 63], [46, 54, 37, 99], [35, 63, 65, 53], [9, 6, 60, 38]]
+#ZZZZ = [[80, 51, 72], [100, 28, 36], [34, 49, 56], [26, 91, 86], [21, 55, 34], [41, 99, 63], [70, 34, 81], [48, 11, 78], [24, 94, 8], [52, 8, 81], [46, 99, 92], [99, 28, 90], [83, 2, 49], [27, 7, 87], [4, 20, 34], [99, 92, 76], [97, 4, 42], [16, 97, 53], [76, 70, 46], [45, 96, 45]]
 
 
+#ZZZZ = [[93, 17, 5, 51], [34, 20, 11, 34], [100, 17, 86, 90], [37, 70, 86, 15], [49, 3, 28, 52], [91, 56, 15, 31], [59, 27, 32, 58], [53, 6, 84, 49], [5, 72, 60, 90], [47, 24, 46, 56], [86, 39, 26, 79], [98, 85, 23, 90], [56, 34, 12, 100], [89, 15, 7, 85], [40, 85, 39, 52], [69, 48, 97, 19], [60, 13, 95, 13], [29, 60, 92, 83], [73, 58, 18, 42], [82, 51, 23, 14]]
 
-#ZZZZ = [[73, 50, 48], [7, 10, 66], [38, 62, 3], [38, 99, 3]]
-#ZZZZ = [[59, 36, 7], [14, 95, 33], [70, 31, 33], [68, 6, 20]]
-#ZZZZ = [[36, 31, 60, 94], [67, 29, 42, 63], [69, 94, 18, 61], [85, 30, 71, 100], [95, 2, 41, 99], [3, 28, 40, 79], [12, 83, 24, 22], [20, 53, 43, 95], [25, 81, 3, 84], [13, 85, 56, 61], [34, 76, 32, 55], [65, 22, 64, 52], [19, 39, 85, 72], [88, 71, 100, 95], [88, 85, 76, 59], [40, 41, 22, 87], [38, 2, 8, 91], [71, 43, 9, 50], [30, 8, 75, 62], [9, 68, 29, 14]]
-#ZZZZ = [[65, 44, 65, 49], [38, 92, 47, 13], [33, 44, 95, 84], [56, 75, 7, 75], [98, 72, 95, 97], [82, 90, 4, 22], [79, 60, 86, 52], [52, 95, 33, 47], [17, 7, 98, 71], [18, 1, 70, 57], [37, 85, 52, 69], [95, 80, 65, 2], [93, 49, 77, 80], [66, 86, 29, 91], [75, 64, 12, 97], [100, 0, 15, 9], [99, 74, 98, 90], [42, 86, 36, 94], [55, 8, 21, 57], [73, 16, 34, 43]]
-#ZZZZ = [[35, 82, 69, 28], [68, 52, 41, 90], [97, 66, 25, 58], [43, 63, 69, 5], [28, 14, 17, 1], [62, 48, 67, 91], [46, 73, 51, 25], [84, 55, 6, 81], [84, 43, 2, 58], [86, 62, 49, 21], [17, 76, 74, 16], [7, 20, 81, 57], [65, 9, 2, 4], [37, 44, 62, 5], [23, 65, 3, 78], [20, 65, 11, 67], [61, 16, 48, 13], [84, 64, 34, 74], [25, 77, 13, 26], [22, 61, 22, 17]]
-#ZZZZ = [[91, 41, 53, 62], [78, 84, 59, 48], [37, 0, 17, 48], [88, 58, 34, 58], [22, 79, 20, 13], [80, 19, 33, 62], [94, 23, 9, 97], [85, 99, 79, 94], [93, 69, 57, 86], [17, 96, 21, 22], [87, 33, 5, 78], [68, 64, 33, 93], [45, 84, 53, 66], [98, 91, 99, 39], [95, 72, 65, 5], [14, 26, 83, 95], [11, 28, 84, 40], [56, 34, 50, 44], [78, 100, 35, 49], [49, 92, 56, 17]]
-#ZZZZ = [[71, 31, 69, 68], [26, 76, 33, 71], [6, 67, 83, 30], [5, 79, 20, 3], [10, 10, 93, 88], [85, 31, 34, 5], [92, 28, 33, 91], [44, 97, 2, 19], [94, 0, 46, 39], [78, 88, 90, 37], [67, 98, 88, 61], [74, 75, 57, 39], [57, 62, 39, 7], [25, 41, 9, 93], [31, 21, 70, 19], [5, 69, 4, 68], [74, 11, 95, 2], [44, 19, 42, 22], [88, 12, 22, 30], [40, 95, 83, 64]]
-#ZZZZ = [[53, 86, 37, 87], [7, 92, 13, 99], [96, 18, 61, 25], [62, 42, 81, 86], [11, 35, 89, 95], [65, 44, 75, 21], [55, 25, 71, 70], [100, 97, 99, 71], [31, 89, 95, 65], [1, 35, 24, 5], [51, 61, 6, 45], [100, 77, 81, 35], [90, 93, 58, 80], [82, 26, 49, 52], [99, 28, 95, 34], [68, 83, 8, 20], [40, 16, 64, 18], [15, 57, 27, 16], [19, 20, 43, 74], [58, 23, 32, 44]]
-ZZZZ = [[56, 49, 97], [84, 30, 8], [26, 9, 4], [96, 95, 37], [56, 85, 94], [83, 61, 66], [17, 12, 50], [85, 68, 83], [28, 98, 53], [72, 46, 1], [2, 22, 74], [97, 80, 81], [96, 95, 59], [59, 22, 18], [54, 28, 51], [96, 95, 92], [54, 92, 91], [80, 88, 26], [37, 51, 70], [66, 52, 27]]
-#Tests = [(ZZZZ, 'ZZZZ')]
+ZZZZ = [[47, 13, 48, 92], [8, 25, 69, 8], [85, 25, 75, 5], [86, 67, 96, 64], [95, 58, 89, 73], [17, 0, 35, 31]]#, [100, 80, 81, 33]]
+#ZZZZ = [[80, 51, 72], [100, 28, 36], [34, 49, 56], [26, 91, 86], [21, 55, 34]]
+
+Tests = []
+for i in xrange(10):
+	Tests.append((MakeRandomPointSet(3), 'Random'))
+
+Tests = [(ZZZZ, 'ZZZZ')]
 
 for Test in Tests:
 	Pts = Test[0]
 	print Test[1]
 	print Pts
-	#FindInitialFacet(Pts)
 	GiftWrap(Pts)
 	print "Done with " + Test[1]
 	print ""
 	print ""
+	global Faces
+	Faces = "Start"
+	global PointToIndexMap
+	PointToIndexMap = "Start"
+	global InitialDim
+	InitialDim = "Sentinel"

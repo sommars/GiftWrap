@@ -52,31 +52,21 @@ def GetUCT(Pts):
 
 #-------------------------------------------------------------------------------
 def GetUCTAndNormal(Vector):
-	def ConvertMatrixToList(Matrix):
-		Pts = []
-		for Row in Matrix.transpose():
-			Pts.append(list(Row))
-		return Pts
 #Stack points vertically
 	HNF, UCT = (matrix(matrix(Vector),ZZ).transpose()).echelon_form(include_zero_rows = True, transformation = True)
 	#We need to check to make sure we're getting the right
 	UCT = ((UCT)^-1)
-	if ConvertMatrixToList(UCT)[0] != Vector:
+	if ConvertMatrixToList(UCT.transpose())[0] != Vector:
 		print "Unexpected first row after UCT. Should be vector"
 		print "Vector = ", Vector
 		print "UCT", UCT
 		raw_input()
-	return UCT.transpose(), ConvertMatrixToList(HNF)
+	return UCT.transpose(), ConvertMatrixToList(HNF.transpose())
 
 #-------------------------------------------------------------------------------
 def GetHNF(Pts):
 	# Instead of thinking about these as points, we should think about these as
 	# being vectors.
-	def ConvertMatrixToList(Matrix):
-		Pts = []
-		for Row in Matrix:
-			Pts.append(list(Row))
-		return Pts
 	if len(Pts) < 2:
 		return "Insufficient points for a Hermite Normal Form"
 
@@ -89,14 +79,19 @@ def GetHNF(Pts):
 	return ConvertMatrixToList(HNFMatrix)
 
 #-------------------------------------------------------------------------------
+def ConvertMatrixToList(Matrix):
+	Pts = []
+	for Row in Matrix:
+		Pts.append(list(Row))
+	for Pt in Pts:
+		for i in xrange(len(Pt)):
+			Pt[i] = Integer(Pt[i])
+	return Pts
+
+#-------------------------------------------------------------------------------
 def GetHNFFromVectorAndPts(Vector, Pts):
 	# Instead of thinking about these as points, we should think about these as
 	# being vectors.
-	def ConvertMatrixToList(Matrix):
-		Pts = []
-		for Row in Matrix:
-			Pts.append(list(Row))
-		return Pts
 	if len(Pts) < 2:
 		return "Insufficient points for a Hermite Normal Form"
 
@@ -112,22 +107,13 @@ def GetHNFFromVectorAndPts(Vector, Pts):
 def GetHNFFromVectors(Vectors):
 	# Instead of thinking about these as points, we should think about these as
 	# being vectors.
-	def ConvertMatrixToList(Matrix):
-		Pts = []
-		for Row in Matrix:
-			Pts.append(list(Row))
-		return Pts
 	HNFMatrix = (matrix(Vectors)).echelon_form(include_zero_rows = False)
 	return ConvertMatrixToList(HNFMatrix)
 
 #-------------------------------------------------------------------------------
 def GetNormalFromNonIntVectors(Vectors):
-	LE = len(Matrix(Vectors).echelon_form().transpose().kernel().gens())
-	#if LE > 1:
-	#	L1 = Matrix(Vectors).echelon_form().transpose().kernel().gens()[0]
-	#	L2 = Matrix(Vectors).echelon_form().transpose().kernel().gens()[1]
-	#	return [L1[i] + L2[i] for i in xrange(len(L1))]
 	return list(Matrix(Vectors).echelon_form().transpose().kernel().gens()[0])
+
 
 #-------------------------------------------------------------------------------
 def GetNormalFromHNF(HNF):
@@ -135,7 +121,10 @@ def GetNormalFromHNF(HNF):
 	HNF = []
 	for Row in M:
 		HNF.append(Row)
-	return FindNormal(HNF)
+	Normal = FindNormal(HNF)
+	for i in xrange(len(Normal)):
+		Normal[i] = Integer(Normal[i])
+	return Normal
 
 #-------------------------------------------------------------------------------
 def DotProduct(U,V):
@@ -146,15 +135,10 @@ def DotProduct(U,V):
 
 #-------------------------------------------------------------------------------
 def TransformPts(Pts, UCT):
-	def ConvertMatrixToList(Matrix):
-		Pts = []
-		for Row in Matrix.transpose():
-			Pts.append(list(Row))
-		return Pts
 	if len(Pts) < 1:
 		return []
 	TransformMatrix = UCT*(matrix(Pts).transpose())
-	return ConvertMatrixToList(TransformMatrix)
+	return ConvertMatrixToList(TransformMatrix.transpose())
 
 #-------------------------------------------------------------------------------
 def TransformPt(Pt, UCT):
@@ -195,15 +179,14 @@ def NormalPointsTowardsPt(Normal, Barycenter, Pt):
 	return
 
 #-------------------------------------------------------------------------------
-def FindNewFacetPts(Pts, Edge, Normal, KnownFacetPts, NormalThroughFacet):
-	FacetBarycenter = FindBarycenter(KnownFacetPts)
+def FindNewFacetPts(Pts, EdgePts, Normal, KnownFacetPts, NormalThroughFacet):
 	MaxAngle = 'Test'
 	NewFacetPts = []
 	for Pt in Pts:
 		if Pt not in KnownFacetPts:
-			Vector = MakeVector(Edge[0], Pt)
+			Vector = MakeVector(EdgePts[0], Pt)
 			if n(DotProduct(Vector, Normal),1000) == 0:
-				print "Denominator == 0!"
+				print "Internal error in FindNewFacetPts, denominator = 0."
 				raw_input()
 			Num = DotProduct(Vector, NormalThroughFacet)
 			Denom = DotProduct(Vector, Normal)
@@ -223,24 +206,21 @@ def FindNewFacetPts(Pts, Edge, Normal, KnownFacetPts, NormalThroughFacet):
 	return NewFacetPts, CorrectNum, CorrectDenom
 
 #-------------------------------------------------------------------------------
-def FindNewFacetPtsFromEdge(Pts, Edge, Normal, KnownFacetPts):
+def FindNewFacetPtsFromEdge(Pts, EdgePts, Normal, KnownFacetPts):
 	# Note that the input normal is an inner normal
-	for i in xrange(len(Normal)):
-		Normal[i] = Integer(Normal[i])				
-	for Pt in Edge:
-		for i in xrange(len(Pt)):
-			Pt[i] = Integer(Pt[i])
-	NormalThroughFacet = GetNormalFromHNF(GetHNFFromVectorAndPts(Normal, Edge))
+	NormalThroughFacet = GetNormalFromHNF(GetHNFFromVectorAndPts(Normal, EdgePts))
 
 	# I want this to be an outer facing normal
+	AdditionalPtOnFacet = 'Sentinel'
 	for Pt in KnownFacetPts:
-		if Pt not in Edge:
+		if Pt not in EdgePts:
 			AdditionalPtOnFacet = Pt
 			break
 	# For the sake of consistency, point the normal outwards. Decide later if that's what we want
-	if NormalPointsTowardsPt(NormalThroughFacet, AdditionalPtOnFacet, Edge[0]):
-		NormalThroughFacet = [-NormalThroughFacet[i] for i in xrange(len(NormalThroughFacet))]
-	return FindNewFacetPts(Pts, Edge, Normal, KnownFacetPts, NormalThroughFacet)
+	if AdditionalPtOnFacet != 'Sentinel':
+		if NormalPointsTowardsPt(NormalThroughFacet, AdditionalPtOnFacet, EdgePts[0]):
+			NormalThroughFacet = [-NormalThroughFacet[i] for i in xrange(len(NormalThroughFacet))]
+	return FindNewFacetPts(Pts, EdgePts, Normal, KnownFacetPts, NormalThroughFacet)
 
 #-------------------------------------------------------------------------------
 def CheckAllPtsLieOnOthersideOfFacetHyperplane(Pts, FacetPts, UCT):
@@ -286,8 +266,53 @@ def CheckAllPtsLieOnOthersideOfFacetHyperplane(Pts, FacetPts, UCT):
 			raw_input()
 	return
 	
+"""
+def GetNormalTest(Pts):
+	Vectors = []
+	for i in xrange(1,len(Pts)):
+		Vectors.append(MakeVector(Pts[0],Pts[i]))
+	NormGens = Matrix(Vectors).echelon_form().transpose().kernel().gens()
+	#print NormGens
+	Normal = list(NormGens[0])
+	for i in xrange(1, len(NormGens)):
+		for j in xrange(len(NormGens[i])):
+			Normal[j] -= NormGens[i][j]
+	#print "DONE", Normal
+	return Normal
+"""
+
+
 #-------------------------------------------------------------------------------
-def MakePointMap(Pts):
+def WrapMaps(AllPts, Pts):
+	Dim = CheckNormalFormDim(GetHNF(Pts))
+	ExistingSPTLPM = "A"
+	ExistingLPTSPM = "A"
+	Length = len(Pts[0])
+	while True:
+		Pts, ShortPointToLongPointMap, LongPointToShortPointMap, Dim = MakePointMap(AllPts, Pts)
+		if len(LongPointToShortPointMap.values()[0]) == Length:
+			if ExistingSPTLPM == "A":
+				ExistingSPTLPM = ShortPointToLongPointMap
+				ExistingLPTSPM = LongPointToShortPointMap
+			break
+		else:
+			Length = len(LongPointToShortPointMap.values()[0])
+		if ExistingSPTLPM == "A":
+			ExistingSPTLPM = ShortPointToLongPointMap
+			ExistingLPTSPM = LongPointToShortPointMap
+		else:
+				ExistingSPTLPM = ComposeMaps(ShortPointToLongPointMap, ExistingSPTLPM)
+				ExistingLPTSPM = ComposeMaps(ExistingLPTSPM, LongPointToShortPointMap)
+	return Pts, ExistingSPTLPM, ExistingLPTSPM, Dim
+
+#-------------------------------------------------------------------------------
+def ComposeMaps(Map1, Map2):
+	return {tuple(k): Map2.get(tuple(v)) for k, v in Map1.items()}
+
+#-------------------------------------------------------------------------------
+def MakePointMap(AllPts, Pts):
+	# Next step is loop through this and do it multiple times to make sure we ACTUALLY cut it down to the appropriate size...
+	# this makes my method seem more and more wrong.
 	HNF = GetHNF(Pts)
 	Dim = CheckNormalFormDim(HNF)
 	if Dim != len(Pts[0]):
@@ -314,15 +339,19 @@ def MakePointMap(Pts):
 				if Row[j] == "Diff":
 					GoodPts[i].append(NewPts[i][j])
 		ReverseUCT = matrix(UCT^-1, ZZ)
-		PointMap = {}
+		ShortPointToLongPointMap = {}
+		LongPointToShortPointMap = {}
 		for Pt in GoodPts:
-			PointMap[tuple(Pt)] = TransformPt(ValuesToPrepend + Pt, ReverseUCT)
+			ShortPointToLongPointMap[tuple(Pt)] = TransformPt(ValuesToPrepend + Pt, ReverseUCT)
+			LongPointToShortPointMap[tuple(ShortPointToLongPointMap[tuple(Pt)])] = Pt
 	else:
 		GoodPts = copy(Pts)
-		PointMap = {}
+		ShortPointToLongPointMap = {}
+		LongPointToShortPointMap = {}
 		for Pt in GoodPts:
-			PointMap[tuple(Pt)] = Pt
-	return GoodPts, PointMap, Dim
+			ShortPointToLongPointMap[tuple(Pt)] = Pt
+			LongPointToShortPointMap[tuple(Pt)] = Pt
+	return GoodPts, ShortPointToLongPointMap, LongPointToShortPointMap, Dim
 
 #-------------------------------------------------------------------------------
 def PutFacetsInCorrectDimension(Facets, PointMap, Barycenter):
@@ -361,14 +390,14 @@ def CheckFacetAgainstSage(Pts, PtsInFacet):
 		TestFace = list(Polytope.face_lattice()[i].ambient_Vrepresentation())
 		TestFace.sort()
 		if TestFace == FacetList:
-			print "You found the points in an initial facet"
+			#print "You found the points in an initial facet"
 			return
 	print "Pts you thought made a facet", PtsInFacet
 	raw_input()
 	return
 
 #-------------------------------------------------------------------------------
-def FindInitialFacet(Pts, Barycenter):
+def FindInitialFacet(Pts):
 	# Not sure if I ever need the Barycenter. requires some more testing...
 	def ScaleNumAndDenom(Num, Denom):
 		C = Num^2+Denom^2
@@ -401,14 +430,25 @@ def FindInitialFacet(Pts, Barycenter):
 		for i in xrange(Dim, len(Axes)):
 			ListForNormalThroughFacet.append(Axes[i])
 		NormalThroughFacet = MakeExactUnitVector(GetNormalFromNonIntVectors(ListForNormalThroughFacet))
-		NewPts, Num, Denom = FindNewFacetPtsGood(Pts, FirstPts, Normal, FirstPts, NormalThroughFacet)
+		NewPts, Num, Denom = FindNewFacetPts(Pts, FirstPts, Normal, FirstPts, NormalThroughFacet)
 		Num, Denom = ScaleNumAndDenom(Num, Denom)
 		FirstPts = NewPts + FirstPts
 		PreviousNormal = copy(Normal)
 		Normal = [-NormalThroughFacet[i]*Denom + Normal[i]*Num for i in xrange(len(Normal))]
 		if not NormalPointsTowardsPt(Normal, Barycenter, FirstPts[0]):
 			print "FLIP NORMAL"
-			raw_input()
+			#raw_input()
 			Normal = [-Normal[i] for i in xrange(len(Normal))]
 	CheckFacetAgainstSage(Pts, FirstPts)
 	return FirstPts
+
+#-------------------------------------------------------------------------------
+def MakeIndexMaps(Pts):
+	PointToIndexMap = {}
+	IndexToPointMap = {}
+	for i in xrange(len(Pts)):
+		Pt = tuple(Pts[i])
+		PointToIndexMap[Pt] = i
+		IndexToPointMap[i] = Pts[i]
+
+	return PointToIndexMap, IndexToPointMap

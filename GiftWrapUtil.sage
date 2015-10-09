@@ -1,5 +1,4 @@
 load("HermesNormal.sage")
-load("2dConvexHull.sage")
 load("Facet.sage")
 
 def PtsAreValid(Pts):
@@ -283,13 +282,13 @@ def GetNormalTest(Pts):
 
 
 #-------------------------------------------------------------------------------
-def WrapMaps(AllPts, Pts):
+def WrapMaps(Pts):
 	Dim = CheckNormalFormDim(GetHNF(Pts))
 	ExistingSPTLPM = "A"
 	ExistingLPTSPM = "A"
 	Length = len(Pts[0])
 	while True:
-		Pts, ShortPointToLongPointMap, LongPointToShortPointMap, Dim = MakePointMap(AllPts, Pts)
+		Pts, ShortPointToLongPointMap, LongPointToShortPointMap, Dim = MakePointMap(Pts)
 		if len(LongPointToShortPointMap.values()[0]) == Length:
 			if ExistingSPTLPM == "A":
 				ExistingSPTLPM = ShortPointToLongPointMap
@@ -310,7 +309,7 @@ def ComposeMaps(Map1, Map2):
 	return {tuple(k): Map2.get(tuple(v)) for k, v in Map1.items()}
 
 #-------------------------------------------------------------------------------
-def MakePointMap(AllPts, Pts):
+def MakePointMap(Pts):
 	# Next step is loop through this and do it multiple times to make sure we ACTUALLY cut it down to the appropriate size...
 	# this makes my method seem more and more wrong.
 	HNF = GetHNF(Pts)

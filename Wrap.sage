@@ -4,8 +4,8 @@ global PointToIndexMap
 PointToIndexMap = "Start"
 global InitialDim
 InitialDim = "Sentinel"
-global AllPts
 load("GiftUtil.sage")
+load("2dConvexHull.sage")
 # The code in this unit is the code that will have to change for going between 3 and n dimensions.
 
 #If all of the points have a column that's identical, this will break. I should immediately make a map in that case..?
@@ -15,7 +15,6 @@ def GiftWrap(Pts):
 	global PointToIndexMap
 	global IndexToPointMap
 	global Barycenter
-	global AllPts
 	if not PtsAreValid(Pts):
 		print "The input set of points is not valid."
 		raw_input()
@@ -23,14 +22,11 @@ def GiftWrap(Pts):
 	Pts = RemoveDups(Pts)
 	OriginalBarycenter = FindBarycenter(Pts)
 	if PointToIndexMap == "Start":
-		AllPts = Pts
-	Pts, ShortPointToLongPointMap, LongPointToShortPointMap, LocalDim = WrapMaps(AllPts, Pts)
-	if PointToIndexMap == "Start":
 		PointToIndexMap, IndexToPointMap = MakeIndexMaps(Pts)
-		InitialDim = LocalDim
-		AllPts = Pts
+	Pts, ShortPointToLongPointMap, LongPointToShortPointMap, LocalDim = WrapMaps(Pts)
 	if Faces == "Start":
 		Faces = []
+		InitialDim = LocalDim
 		for Dim in xrange(1,len(Pts[0])):
 			Faces.append([])
 	Barycenter = FindBarycenter(Pts)
@@ -132,11 +128,11 @@ def GiftWrap(Pts):
 
 #-------------------------------------------------------------------------------
 def Make2dFace(FacePts, Pts, LongPointToShortPointMap, ShortPointToLongPointMap):
-	UCT = GetUCTAndNormal(GetNormalFromHNF(GetHNF(FacePts)))[0]
-	ShiftedFacePts = TransformPts(FacePts, UCT)
-	# I don't really need to remove points like this. I can just wait til the end and knock them off.
-	Hull, PointsToRemove = ConvexHull2d(ShiftedFacePts)
-	Hull = TransformPts(Hull, matrix(UCT^-1, ZZ))
+	FacePts, LocalShortPointToLongPointMap, LocalLongPointToShortPointMap, LocalDim = WrapMaps(FacePts)
+	ShortHull = ConvexHull2d(FacePts)
+	Hull = []
+	for Pt in ShortHull:
+		Hull.append(LocalShortPointToLongPointMap[tuple(Pt)])
 
 	NewFace = Face()
 	Normal = GetNormalFromHNF(GetHNF(Hull))
@@ -270,20 +266,20 @@ for k in range(20):
 
 def MakeRandomPointSet(Dim):
 	Pts = []
-	for i in xrange(randint(20,20)):
+	for i in xrange(randint(7,7)):
 		Pts.append([])
 		for j in xrange(Dim):
 			Pts[i].append(Integer(randint(0,100)))
 	return Pts
 
 
-#Tetrahedron = [[46, 64, 38], [68, 70, 19], [18, 97, 28], [20, 73, 66], [16, 81, 27], [37, 1, 16], [98, 25, 33], [29, 45, 45], [100, 19, 5], [83, 22, 68], [50, 95, 92], [62, 66, 33], [47, 48, 93], [82, 46, 41], [10, 13, 26], [53, 49, 51], [53, 74, 75]]
-#Tests = [(Tetrahedron,'Tetrahedron')]
+
 #GOTWEIRDBEHAVIORCHECKWHENWORKS[[22, 66, 45, 76], [45, 38, 6, 99], [59, 23, 22, 8], [8, 89, 10, 90], [67, 4, 4, 17], [73, 14, 50, 16], [27, 31, 18, 93], [48, 97, 12, 44], [80, 55, 56, 19], [4, 2, 34, 68], [65, 32, 7, 75], [61, 32, 2, 13], [48, 64, 8, 60], [61, 100, 91, 60], [41, 23, 85, 23], [80, 55, 48, 72], [31, 77, 2, 12], [60, 93, 16, 64], [53, 53, 50, 23], [55, 81, 9, 88]]
 
 ZZZZ = [[47, 13, 48, 92], [8, 25, 69, 8], [85, 25, 75, 5], [86, 67, 96, 64], [95, 58, 89, 73], [17, 0, 35, 31], [100, 80, 81, 33], [63, 90, 11, 35], [71, 49, 85, 77], [60, 99, 25, 38], [66, 93, 44, 18], [84, 57, 58, 70], [19, 20, 76, 57], [1, 8, 87, 61], [82, 62, 53, 57], [82, 31, 8, 80], [51, 66, 0, 63], [46, 54, 37, 99], [35, 63, 65, 53], [9, 6, 60, 38]]
 #ZZZZ = [[80, 51, 72], [100, 28, 36], [34, 49, 56], [26, 91, 86], [21, 55, 34], [41, 99, 63], [70, 34, 81], [48, 11, 78], [24, 94, 8], [52, 8, 81], [46, 99, 92], [99, 28, 90], [83, 2, 49], [27, 7, 87], [4, 20, 34], [99, 92, 76], [97, 4, 42], [16, 97, 53], [76, 70, 46], [45, 96, 45]]
 
+#SOMEREASONDOESN"TWORK[[80, 33, 17, 8, 46, 49], [75, 23, 97, 76, 2, 12], [62, 52, 71, 55, 64, 51], [13, 75, 99, 56, 55, 93], [10, 88, 39, 18, 83, 75], [10, 12, 75, 26, 89, 6], [22, 36, 95, 66, 27, 7]]
 
 #ZZZZ = [[93, 17, 5, 51], [34, 20, 11, 34], [100, 17, 86, 90], [37, 70, 86, 15], [49, 3, 28, 52], [91, 56, 15, 31], [59, 27, 32, 58], [53, 6, 84, 49], [5, 72, 60, 90], [47, 24, 46, 56], [86, 39, 26, 79], [98, 85, 23, 90], [56, 34, 12, 100], [89, 15, 7, 85], [40, 85, 39, 52], [69, 48, 97, 19], [60, 13, 95, 13], [29, 60, 92, 83], [73, 58, 18, 42], [82, 51, 23, 14]]
 
@@ -294,13 +290,19 @@ Tests = []
 for i in xrange(10):
 	Tests.append((MakeRandomPointSet(3), 'Random'))
 
-Tests = [(ZZZZ, 'ZZZZ')]
+ZZZZ = [[22, 66, 45, 76], [45, 38, 6, 99], [59, 23, 22, 8], [8, 89, 10, 90], [67, 4, 4, 17], [73, 14, 50, 16], [27, 31, 18, 93], [48, 97, 12, 44], [80, 55, 56, 19], [4, 2, 34, 68], [65, 32, 7, 75], [61, 32, 2, 13], [48, 64, 8, 60], [61, 100, 91, 60], [41, 23, 85, 23], [80, 55, 48, 72], [31, 77, 2, 12], [60, 93, 16, 64], [53, 53, 50, 23], [55, 81, 9, 88]]
+
+ZZZZ = [[61, 100, 91, 60], [73, 14, 50, 16], [80, 55, 48, 72], [80, 55, 56, 19]]
+#ZZZZ= [[61, -483939, -5684944], [73, -483946, -5684952], [80, -483950, -5684954], [80, -483950, -5684953]]
+
+#Tests = [(ZZZZ, 'ZZZZ')]
 
 for Test in Tests:
 	Pts = Test[0]
 	print Test[1]
 	print Pts
 	GiftWrap(Pts)
+	#print FindInitialFacet(Pts)
 	print "Done with " + Test[1]
 	print ""
 	print ""

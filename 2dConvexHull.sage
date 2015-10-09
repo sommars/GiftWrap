@@ -23,14 +23,6 @@ def FindDistinctCoords(Pts):
 	return
 
 #-------------------------------------------------------------------------------
-def FindExtraPoints(Pts, Hull):
-	ExtraPts = []
-	for Pt in Pts:
-		if Pt not in Hull:
-			ExtraPts.append(Pt)
-	return ExtraPts
-
-#-------------------------------------------------------------------------------
 def ConvexHull2d(Pts):
 	Hull = [min(Pts)]
 	global X
@@ -40,4 +32,4 @@ def ConvexHull2d(Pts):
 		Pt2 = FindNextPt(Pts, Pt)
 		if Pt2 != Hull[0]:
 			Hull.append(Pt2)
-	return Hull, FindExtraPoints(Pts,Hull)
+	return Hull

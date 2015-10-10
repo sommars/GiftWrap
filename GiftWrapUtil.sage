@@ -1,5 +1,6 @@
 load("HermesNormal.sage")
 load("Facet.sage")
+load("2dConvexHull.sage")
 
 def PtsAreValid(Pts):
 	Dim = len(Pts[0])
@@ -184,11 +185,11 @@ def FindNewFacetPts(Pts, EdgePts, Normal, KnownFacetPts, NormalThroughFacet):
 	for Pt in Pts:
 		if Pt not in KnownFacetPts:
 			Vector = MakeVector(EdgePts[0], Pt)
-			if n(DotProduct(Vector, Normal),1000) == 0:
+			Denom = DotProduct(Vector, Normal)
+			if n(Denom,1000) == 0:
 				print "Internal error in FindNewFacetPts, denominator = 0."
 				raw_input()
 			Num = DotProduct(Vector, NormalThroughFacet)
-			Denom = DotProduct(Vector, Normal)
 			Angle = - Num/Denom
 			if MaxAngle == 'Test':
 				MaxAngle = Angle
@@ -207,8 +208,8 @@ def FindNewFacetPts(Pts, EdgePts, Normal, KnownFacetPts, NormalThroughFacet):
 #-------------------------------------------------------------------------------
 def FindNewFacetPtsFromEdge(Pts, EdgePts, Normal, KnownFacetPts):
 	# Note that the input normal is an inner normal
+	Normal = [Normal[i] for i in xrange(len(Normal))]
 	NormalThroughFacet = GetNormalFromHNF(GetHNFFromVectorAndPts(Normal, EdgePts))
-
 	# I want this to be an outer facing normal
 	AdditionalPtOnFacet = 'Sentinel'
 	for Pt in KnownFacetPts:
@@ -216,8 +217,7 @@ def FindNewFacetPtsFromEdge(Pts, EdgePts, Normal, KnownFacetPts):
 			AdditionalPtOnFacet = Pt
 			break
 	# For the sake of consistency, point the normal outwards. Decide later if that's what we want
-	if AdditionalPtOnFacet != 'Sentinel':
-		if NormalPointsTowardsPt(NormalThroughFacet, AdditionalPtOnFacet, EdgePts[0]):
+	if NormalPointsTowardsPt(NormalThroughFacet, AdditionalPtOnFacet, EdgePts[0]):
 			NormalThroughFacet = [-NormalThroughFacet[i] for i in xrange(len(NormalThroughFacet))]
 	return FindNewFacetPts(Pts, EdgePts, Normal, KnownFacetPts, NormalThroughFacet)
 
@@ -264,22 +264,6 @@ def CheckAllPtsLieOnOthersideOfFacetHyperplane(Pts, FacetPts, UCT):
 			print Pts
 			raw_input()
 	return
-	
-"""
-def GetNormalTest(Pts):
-	Vectors = []
-	for i in xrange(1,len(Pts)):
-		Vectors.append(MakeVector(Pts[0],Pts[i]))
-	NormGens = Matrix(Vectors).echelon_form().transpose().kernel().gens()
-	#print NormGens
-	Normal = list(NormGens[0])
-	for i in xrange(1, len(NormGens)):
-		for j in xrange(len(NormGens[i])):
-			Normal[j] -= NormGens[i][j]
-	#print "DONE", Normal
-	return Normal
-"""
-
 
 #-------------------------------------------------------------------------------
 def WrapMaps(Pts):
@@ -310,8 +294,6 @@ def ComposeMaps(Map1, Map2):
 
 #-------------------------------------------------------------------------------
 def MakePointMap(Pts):
-	# Next step is loop through this and do it multiple times to make sure we ACTUALLY cut it down to the appropriate size...
-	# this makes my method seem more and more wrong.
 	HNF = GetHNF(Pts)
 	Dim = CheckNormalFormDim(HNF)
 	if Dim != len(Pts[0]):
@@ -322,15 +304,6 @@ def MakePointMap(Pts):
 			for j in xrange(len(NewPts[0])):
 				if NewPts[i][j] != Row[j]:
 					Row[j] = "Diff"
-		ValuesToPrepend = []
-		for i in xrange(len(Row)):
-			if Row[i] != "Diff":
-				ValuesToPrepend.append(Row[i])
-			if i != 0 and Row[i] != "Diff" and Row[i-1] == "Diff":
-				print "Internal error: unexpected result from HNF in transformingpts"
-				print Row
-				print Pts
-				raw_input()
 		GoodPts = []
 		for i in xrange(len(NewPts)):
 			GoodPts.append([])
@@ -341,7 +314,15 @@ def MakePointMap(Pts):
 		ShortPointToLongPointMap = {}
 		LongPointToShortPointMap = {}
 		for Pt in GoodPts:
-			ShortPointToLongPointMap[tuple(Pt)] = TransformPt(ValuesToPrepend + Pt, ReverseUCT)
+			LongPt = []
+			MyIndex = 0
+			for Coord in Row:
+				if Coord != "Diff":
+					LongPt.append(Coord)
+				else:
+					LongPt.append(Pt[MyIndex])
+					MyIndex += 1
+			ShortPointToLongPointMap[tuple(Pt)] = TransformPt(LongPt, ReverseUCT)
 			LongPointToShortPointMap[tuple(ShortPointToLongPointMap[tuple(Pt)])] = Pt
 	else:
 		GoodPts = copy(Pts)
@@ -389,18 +370,19 @@ def CheckFacetAgainstSage(Pts, PtsInFacet):
 		TestFace = list(Polytope.face_lattice()[i].ambient_Vrepresentation())
 		TestFace.sort()
 		if TestFace == FacetList:
-			#print "You found the points in an initial facet"
 			return
-	print "Pts you thought made a facet", PtsInFacet
+	print "The following points do not lie on a facet: ", PtsInFacet
 	raw_input()
 	return
 
 #-------------------------------------------------------------------------------
-def FindInitialFacet(Pts):
+def FindInitialFacet(Pts, Barycenter):
 	# Not sure if I ever need the Barycenter. requires some more testing...
+
 	def ScaleNumAndDenom(Num, Denom):
 		C = Num^2+Denom^2
 		return Num/sqrt(C), Denom/sqrt(C)
+
 	def FindFirstPts(Pts):
 		# Just sorting the points
 		FirstPts = []
@@ -412,6 +394,7 @@ def FindInitialFacet(Pts):
 				FirstPts = [Pt]
 				FirstPtValue = Pt[0]
 		return FirstPts
+
 	FirstPts = FindFirstPts(Pts)
 	Normal = [-1 if i == 0 else 0 for i in xrange(len(Pts[0]))]
 	Axes = []
@@ -436,7 +419,6 @@ def FindInitialFacet(Pts):
 		Normal = [-NormalThroughFacet[i]*Denom + Normal[i]*Num for i in xrange(len(Normal))]
 		if not NormalPointsTowardsPt(Normal, Barycenter, FirstPts[0]):
 			print "FLIP NORMAL"
-			#raw_input()
 			Normal = [-Normal[i] for i in xrange(len(Normal))]
 	CheckFacetAgainstSage(Pts, FirstPts)
 	return FirstPts
@@ -451,3 +433,19 @@ def MakeIndexMaps(Pts):
 		IndexToPointMap[i] = Pts[i]
 
 	return PointToIndexMap, IndexToPointMap
+
+#-------------------------------------------------------------------------------
+def CreateCyclicLists(n):
+	system = []
+	for i in xrange(n-1):
+		equation = []
+		for j in xrange(n):
+			mon = [0 for x in xrange(n)]
+			for k in xrange(i+1):
+				mon[(j+k)%n]=1
+			equation.append(mon)
+		system.append(equation)
+	mon1 = [0 for x in xrange(n)]
+	mon2 = [1 for x in xrange(n)]
+	system.append([mon1,mon2])
+	return system

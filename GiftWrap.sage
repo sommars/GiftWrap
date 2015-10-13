@@ -12,7 +12,7 @@ def GiftWrap(Pts):
 		return
 	Pts = RemoveDups(Pts)
 	if len(Pts) < 2:
-		print "The points on the convex hull in the order in which they occur:"
+		print "The point on the convex hull:"
 		print Pts[0]
 		return
 	if PointToIndexMap == "Start":
@@ -28,8 +28,14 @@ def GiftWrap(Pts):
 		print "The points on the convex hull in the order in which they occur:"
 		FullDimPts = []
 		for Pt in ConvexHull2d(Pts):
-			FullDimPts.append(ShortPointToLongPtMap[tuple(Pt)])
+			FullDimPts.append(ShortPointToLongPointMap[tuple(Pt)])
 		print FullDimPts
+		return
+	elif InitialDim == 1:
+		print "The points on the convex hull in the order in which they occur:"
+		FullDimPts = [ShortPointToLongPointMap[tuple(Pts[i])] for i in xrange(len(Pts))]
+		FullDimPts.sort()
+		print FullDimPts[0], FullDimPts[1]
 		return
 	FirstPts = FindInitialFacet(Pts)
 	IndexOfFirstFace = MakeFace(FirstPts, Pts, LongPointToShortPointMap, ShortPointToLongPointMap, Barycenter)
@@ -181,14 +187,14 @@ def MakeFace(FacePts, Pts, LongPointToShortPointMap, ShortPointToLongPointMap, B
 def MakeRandomPointSet(Dim,Num):
 	Pts = []
 	for i in xrange(Num):
-		Pts.append([101])
+		Pts.append([])
 		for j in xrange(Dim):
 			Pts[i].append(Integer(randint(-100,100)))
 	return Pts
 
 Tests = []
 for i in xrange(1):
-	Tests.append((MakeRandomPointSet(3,1), 'Random'))
+	Tests.append((MakeRandomPointSet(3,3), 'Random'))
 
 """
 Cyclic = CreateCyclicLists(5)

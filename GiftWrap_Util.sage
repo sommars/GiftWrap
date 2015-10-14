@@ -136,30 +136,34 @@ def FindNewFacePtsFromEdge(Pts, EdgePts, Normal, KnownFacePts):
 	return FindNewFacePts(Pts, EdgePts, Normal, KnownFacePts, NormalThroughFace)
 
 #-------------------------------------------------------------------------------
-def WrapMaps(Pts):
+def MakeMaps(Pts, ShortPointToLongPointMap = "Start", LongPointToShortPointMap = "Start"):
 	def ComposeMaps(Map1, Map2):
 		return {tuple(k): Map2.get(tuple(v)) for k, v in Map1.items()}
 
-	Dim = CheckNormalFormDim(GetHNF(Pts))
-	ExistingSPTLPM = "Start"
-	ExistingLPTSPM = "Start"
-	Length = len(Pts[0])
 	while True:
-		Pts, ShortPointToLongPointMap, LongPointToShortPointMap, Dim = MakePointMap(Pts)
-		if len(LongPointToShortPointMap.values()[0]) == Length:
-			if ExistingSPTLPM == "Start":
-				ExistingSPTLPM = ShortPointToLongPointMap
-				ExistingLPTSPM = LongPointToShortPointMap
-			break
+		Length = len(Pts[0])
+
+		Pts, TempShortPointToLongPointMap, TempLongPointToShortPointMap, Dim = MakePointMap(Pts)
+
+		if len(Pts[0]) == Length:
+			if ShortPointToLongPointMap == "Start":
+				return Pts, TempShortPointToLongPointMap, TempLongPointToShortPointMap, Dim
+			else:
+				break
+
+		if ShortPointToLongPointMap == "Start":
+			ShortPointToLongPointMap = TempShortPointToLongPointMap
+			LongPointToShortPointMap = TempLongPointToShortPointMap
 		else:
-			Length = len(LongPointToShortPointMap.values()[0])
-		if ExistingSPTLPM == "Start":
-			ExistingSPTLPM = ShortPointToLongPointMap
-			ExistingLPTSPM = LongPointToShortPointMap
-		else:
-				ExistingSPTLPM = ComposeMaps(ShortPointToLongPointMap, ExistingSPTLPM)
-				ExistingLPTSPM = ComposeMaps(ExistingLPTSPM, LongPointToShortPointMap)
-	return Pts, ExistingSPTLPM, ExistingLPTSPM, Dim
+			ShortPointToLongPointMap = ComposeMaps(TempShortPointToLongPointMap, ShortPointToLongPointMap)
+			LongPointToShortPointMap = ComposeMaps(LongPointToShortPointMap, TempLongPointToShortPointMap)
+			KeysToRemove = []
+			for Key in LongPointToShortPointMap:
+				if LongPointToShortPointMap[Key] == None:
+					KeysToRemove.append(Key)
+			for Key in KeysToRemove:
+				LongPointToShortPointMap.pop(Key)
+	return Pts, ShortPointToLongPointMap, 	LongPointToShortPointMap, Dim
 
 #-------------------------------------------------------------------------------
 def MakePointMap(Pts):
@@ -175,7 +179,7 @@ def MakePointMap(Pts):
 	HNF = GetHNF(Pts)
 	Dim = CheckNormalFormDim(HNF)
 	if Dim != len(Pts[0]):
-		UCT = GetUCT(GetNormalFromHNF(GetHNF(Pts)))
+		UCT = GetUCT(GetNormalFromHNF(HNF))
 		NewPts = TransformPts(Pts, UCT)
 		Row = copy(NewPts[0])
 		for i in xrange(1, len(NewPts)):
@@ -245,14 +249,15 @@ def FindInitialFacet(Pts):
 	Normal = [-1 if i == 0 else 0 for i in xrange(len(Pts[0]))]
 	Axes = [[1 if j == i else 0 for j in xrange(len(Pts[0]))] for i in xrange(2,len(Pts[0]))]
 	while True:
-		Dim = CheckNormalFormDim(GetHNF(FirstPts))
+		if len(FirstPts) == 1:
+			Dim = 0
+		else:
+			Dim = CheckNormalFormDim(GetHNF(FirstPts))
 		if Dim == len(Pts[0]) - 1:
 			break
 		ListForComputingNormalThroughFacet = [Normal]
 		for i in xrange(1, len(FirstPts)):
 			ListForComputingNormalThroughFacet.append(MakeVector(FirstPts[0], FirstPts[i]))
-		if len(FirstPts) == 1:
-			Dim = 0
 		for i in xrange(Dim, len(Axes)):
 			ListForComputingNormalThroughFacet.append(Axes[i])
 		NormalThroughFacet = GetUnitNormalThroughFacet(ListForComputingNormalThroughFacet)

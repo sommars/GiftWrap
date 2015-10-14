@@ -1,15 +1,1 @@
-I've axed all of the extraneous UCT in the main function. Still need to knock out all of the UCT in FindInitialFacet.
-This should be quite doable, but will require refactoring code.
-- When I have a single initial point, then I can take the inner normal of [-1,0,0] and I can use the normal 
-resting in the hyperplane as [0,0,1].
-- However, if I have two points, this means that I have found an edge. I can do essentially the same thing I do in
-the general situation. I have the same normal to the hyperplane [-1,0,0]. I must use a specific normal to the pointset though, which I can find by calling GetNormalFromHNF(GetHNFFromVectorAndPts([-1,0,0], Edge))
-- If I have three points, I have two situations: I could either have an edge or I could have a facet. To distinguish
-between the two cases, it is necessary to do a HNF and check the number of dimensions spanned by the result.
-
-Generally, this shouldn't be written with a while loop, at least not for the 3d version. I should just handle each
-case separately. The only one that requires any extra work is the first case, where I need to do one more rotation.
-
--Currently, I'm keeping the vertices, not references to the vertices. This needs to be improved
-
--ALSO, think about adding in some testing for the MakeFacet routine. When I do a UCT in it, make sure all of the points lie on one side of it. Add in testing for random polytopes.
+Document code

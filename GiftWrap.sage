@@ -1,7 +1,7 @@
 from time import time
 load("GiftWrap_Util.sage")
 
-def GiftWrap(Pts):
+def GiftWrap(Pts, InitialLongPointToShortPointMap = "Start", InitialShortPointToLongPointMap = "Start"):
 	global Faces
 	global PointToIndexMap
 	global IndexToPointMap
@@ -17,7 +17,9 @@ def GiftWrap(Pts):
 		return
 	if PointToIndexMap == "Start":
 		PointToIndexMap, IndexToPointMap = MakeIndexMaps(Pts)
-	Pts, ShortPointToLongPointMap, LongPointToShortPointMap, LocalDim = WrapMaps(Pts)
+
+	Pts, ShortPointToLongPointMap, LongPointToShortPointMap, LocalDim = MakeMaps(Pts, InitialShortPointToLongPointMap, InitialLongPointToShortPointMap)
+
 	if Faces == "Start":
 		Faces = []
 		InitialDim = LocalDim
@@ -38,7 +40,7 @@ def GiftWrap(Pts):
 		print FullDimPts[0], FullDimPts[1]
 		return
 	FirstPts = FindInitialFacet(Pts)
-	IndexOfFirstFace = MakeFace(FirstPts, Pts, LongPointToShortPointMap, ShortPointToLongPointMap, Barycenter)
+	IndexOfFirstFace = MakeFace(FirstPts, Pts, LongPointToShortPointMap, ShortPointToLongPointMap, Barycenter, LocalDim - 1)
 	FaceIndices = set([IndexOfFirstFace])
 	EdgesToRotateOver = set([])
 	for ChildEdge in Faces[LocalDim-2][IndexOfFirstFace].Children:
@@ -68,7 +70,7 @@ def GiftWrap(Pts):
 		FacePts = EdgePts + FindNewFacePtsFromEdge(Pts, EdgePts, InnerNormal, VerticesToUse)[0]
 
 		#Call MakeFace on the points I've found and do some bookkeeping
-		NewFaceIndex = MakeFace(FacePts, Pts, LongPointToShortPointMap, ShortPointToLongPointMap, Barycenter)
+		NewFaceIndex = MakeFace(FacePts, Pts, LongPointToShortPointMap, ShortPointToLongPointMap, Barycenter, LocalDim - 1)
 		if NewFaceIndex not in FaceIndices:
 			EdgesToRotateOver.add(Edge)
 			FaceIndices.add(NewFaceIndex)
@@ -109,16 +111,9 @@ def GiftWrap(Pts):
 	return FaceIndices
 
 #-------------------------------------------------------------------------------
-def MakeFace(FacePts, Pts, LongPointToShortPointMap, ShortPointToLongPointMap, Barycenter):
-	Dimension = CheckNormalFormDim(GetHNF(FacePts))
-
-	#This is to check if this set of points has already been found
-	FacePtsInOriginalDim = []
-	PtIndexSet = set()
-	for Pt in FacePts:
-		LongPt = ShortPointToLongPointMap[tuple(Pt)]
-		FacePtsInOriginalDim.append(LongPt)
-		PtIndexSet.add(PointToIndexMap[tuple(LongPt)])
+def MakeFace(FacePts, Pts, LongPointToShortPointMap, ShortPointToLongPointMap, Barycenter, Dimension):
+	#Check if this face has already been defined
+	PtIndexSet = set([PointToIndexMap[tuple(ShortPointToLongPointMap[tuple(FacePts[i])])] for i in xrange(len(FacePts))])
 	for i in xrange(len(Faces[Dimension-1])):
 		if len((Faces[Dimension-1][i].Vertices).difference(PtIndexSet)) == 0:
 			return i
@@ -128,7 +123,7 @@ def MakeFace(FacePts, Pts, LongPointToShortPointMap, ShortPointToLongPointMap, B
 	NewFace.Dimension = Dimension
 
 	if Dimension == 2:
-		FacePts, LocalShortPointToLongPointMap, LocalLongPointToShortPointMap, LocalDim = WrapMaps(FacePts)
+		FacePts, LocalShortPointToLongPointMap, LocalLongPointToShortPointMap, LocalDim = MakeMaps(FacePts)
 		Hull = []
 		for Pt in ConvexHull2d(FacePts):
 			Hull.append(ShortPointToLongPointMap[tuple(LocalShortPointToLongPointMap[tuple(Pt)])])
@@ -151,14 +146,13 @@ def MakeFace(FacePts, Pts, LongPointToShortPointMap, ShortPointToLongPointMap, B
 				EdgeFace.Vertices = Edge
 				Faces[0].append(EdgeFace)
 				NewFace.Children.add(len(Faces[0])-1)
-				EdgeFace.Neighbors = set([])
 				for i in xrange(len(Faces[0])):
 					PossibleNeighbor = Faces[0][i]
 					if len(PossibleNeighbor.Vertices.intersection(EdgeFace.Vertices)) == 1:
 						PossibleNeighbor.Neighbors.add((len(Faces[0])-1,list(PossibleNeighbor.Vertices.intersection(EdgeFace.Vertices))[0]))
 						EdgeFace.Neighbors.add((i,list(PossibleNeighbor.Vertices.intersection(EdgeFace.Vertices))[0]))
 	elif Dimension > 2:
-		NewFace.Children = GiftWrap(FacePtsInOriginalDim)
+		NewFace.Children = GiftWrap(FacePts, LongPointToShortPointMap, ShortPointToLongPointMap)
 		for ChildFaceIndex in NewFace.Children:
 			NewFace.Vertices = NewFace.Vertices.union(Faces[Dimension-2][ChildFaceIndex].Vertices)
 	else:
@@ -193,15 +187,15 @@ def MakeRandomPointSet(Dim,Num):
 	return Pts
 
 Tests = []
-for i in xrange(1):
-	Tests.append((MakeRandomPointSet(3,3), 'Random'))
+for i in xrange(2):
+	Tests.append((MakeRandomPointSet(5,10), 'Random'))
 
-"""
-Cyclic = CreateCyclicLists(5)
+
+Cyclic = CreateCyclicLists(8)
 Tests = []
 for i in xrange(len(Cyclic)):
 	Tests.append((Cyclic[i], 'Cyclic'))
-"""
+
 
 InitialTime = time()
 for k in range(20):

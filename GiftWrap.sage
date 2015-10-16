@@ -1,7 +1,14 @@
 from time import time
 load("GiftWrap_Util.sage")
 
-def GiftWrap(Pts, InitialLongPointToShortPointMap = "Start", InitialShortPointToLongPointMap = "Start"):
+def GiftWrap(Pts):
+	global Faces
+	Faces = "Start"
+	global PointToIndexMap
+	PointToIndexMap = "Start"
+	return DoGiftWrap(Pts)
+
+def DoGiftWrap(Pts, InitialLongPointToShortPointMap = "Start", InitialShortPointToLongPointMap = "Start"):
 	global Faces
 	global PointToIndexMap
 	global IndexToPointMap
@@ -40,7 +47,8 @@ def GiftWrap(Pts, InitialLongPointToShortPointMap = "Start", InitialShortPointTo
 		print FullDimPts[0], FullDimPts[1]
 		return
 	FirstPts = FindInitialFacet(Pts)
-	IndexOfFirstFace = MakeFace(FirstPts, Pts, LongPointToShortPointMap, ShortPointToLongPointMap, Barycenter, LocalDim - 1)
+	IndexOfFirstFace, PtIndicesToRemove = MakeFace(FirstPts, Pts, LongPointToShortPointMap, ShortPointToLongPointMap, Barycenter, LocalDim - 1)
+	Pts, ShortPointToLongPointMap, LongPointToShortPointMap = RemovePts(PtIndicesToRemove, Pts, ShortPointToLongPointMap, LongPointToShortPointMap, IndexToPointMap)
 	FaceIndices = set([IndexOfFirstFace])
 	EdgesToRotateOver = set([])
 	for ChildEdge in Faces[LocalDim-2][IndexOfFirstFace].Children:
@@ -67,10 +75,11 @@ def GiftWrap(Pts, InitialLongPointToShortPointMap = "Start", InitialShortPointTo
 
 		Normal = GetNormalFromHNF(GetHNF(VerticesToUse))
 		InnerNormal = MakeNormalPointInDirectionOfPt(Normal, Barycenter, EdgePts[0])
-		FacePts = EdgePts + FindNewFacePtsFromEdge(Pts, EdgePts, InnerNormal, VerticesToUse)[0]
 
+		FacePts = EdgePts + FindNewFacePtsFromEdge(Pts, EdgePts, InnerNormal, VerticesToUse)[0]
 		#Call MakeFace on the points I've found and do some bookkeeping
-		NewFaceIndex = MakeFace(FacePts, Pts, LongPointToShortPointMap, ShortPointToLongPointMap, Barycenter, LocalDim - 1)
+		NewFaceIndex, PtIndicesToRemove = MakeFace(FacePts, Pts, LongPointToShortPointMap, ShortPointToLongPointMap, Barycenter, LocalDim - 1)
+		Pts, ShortPointToLongPointMap, LongPointToShortPointMap = RemovePts(PtIndicesToRemove, Pts, ShortPointToLongPointMap, LongPointToShortPointMap, IndexToPointMap)
 		if NewFaceIndex not in FaceIndices:
 			EdgesToRotateOver.add(Edge)
 			FaceIndices.add(NewFaceIndex)
@@ -107,8 +116,8 @@ def GiftWrap(Pts, InitialLongPointToShortPointMap = "Start", InitialShortPointTo
 			raw_input()
 		else:
 			print "Euler characteristic passed for polytope that lives in dimension", LocalDim
-			return
-	return FaceIndices
+			return Faces, IndexToPointMap
+	return FaceIndices, PtIndicesToRemove
 
 #-------------------------------------------------------------------------------
 def MakeFace(FacePts, Pts, LongPointToShortPointMap, ShortPointToLongPointMap, Barycenter, Dimension):
@@ -116,7 +125,7 @@ def MakeFace(FacePts, Pts, LongPointToShortPointMap, ShortPointToLongPointMap, B
 	PtIndexSet = set([PointToIndexMap[tuple(ShortPointToLongPointMap[tuple(FacePts[i])])] for i in xrange(len(FacePts))])
 	for i in xrange(len(Faces[Dimension-1])):
 		if len((Faces[Dimension-1][i].Vertices).difference(PtIndexSet)) == 0:
-			return i
+			return i, []
 
 	NewFace = Face()
 	NewFaceIndex = len(Faces[Dimension-1])
@@ -125,10 +134,14 @@ def MakeFace(FacePts, Pts, LongPointToShortPointMap, ShortPointToLongPointMap, B
 	if Dimension == 2:
 		FacePts, LocalShortPointToLongPointMap, LocalLongPointToShortPointMap, LocalDim = MakeMaps(FacePts)
 		Hull = []
-		for Pt in ConvexHull2d(FacePts):
+		ConvexHullPts, PtsToRemove = ConvexHull2d(FacePts)
+		for Pt in ConvexHullPts:
 			Hull.append(ShortPointToLongPointMap[tuple(LocalShortPointToLongPointMap[tuple(Pt)])])
 		for Pt in Hull:
 			NewFace.Vertices.add(PointToIndexMap[tuple(Pt)])
+		PtIndicesToRemove = []
+		for Pt in PtsToRemove:
+			PtIndicesToRemove.append(PointToIndexMap[tuple(ShortPointToLongPointMap[tuple(LocalShortPointToLongPointMap[tuple(Pt)])])])
 
 		for i in xrange(len(Hull)):
 			EdgeFound = False
@@ -152,7 +165,7 @@ def MakeFace(FacePts, Pts, LongPointToShortPointMap, ShortPointToLongPointMap, B
 						PossibleNeighbor.Neighbors.add((len(Faces[0])-1,list(PossibleNeighbor.Vertices.intersection(EdgeFace.Vertices))[0]))
 						EdgeFace.Neighbors.add((i,list(PossibleNeighbor.Vertices.intersection(EdgeFace.Vertices))[0]))
 	elif Dimension > 2:
-		NewFace.Children = GiftWrap(FacePts, LongPointToShortPointMap, ShortPointToLongPointMap)
+		NewFace.Children, PtIndicesToRemove = DoGiftWrap(FacePts, LongPointToShortPointMap, ShortPointToLongPointMap)
 		for ChildFaceIndex in NewFace.Children:
 			NewFace.Vertices = NewFace.Vertices.union(Faces[Dimension-2][ChildFaceIndex].Vertices)
 	else:
@@ -175,7 +188,7 @@ def MakeFace(FacePts, Pts, LongPointToShortPointMap, ShortPointToLongPointMap, B
 
 	Faces[Dimension-1].append(NewFace)
 	IndexOfFace = NewFaceIndex
-	return IndexOfFace
+	return IndexOfFace, PtIndicesToRemove
 
 
 def MakeRandomPointSet(Dim,Num):
@@ -187,31 +200,16 @@ def MakeRandomPointSet(Dim,Num):
 	return Pts
 
 Tests = []
-for i in xrange(2):
-	Tests.append((MakeRandomPointSet(5,10), 'Random'))
+for i in xrange(6):
+	Tests.append(MakeRandomPointSet(6,10))
 
 
-Cyclic = CreateCyclicLists(8)
+Cyclic = CreateCyclicLists(7)
 Tests = []
 for i in xrange(len(Cyclic)):
-	Tests.append((Cyclic[i], 'Cyclic'))
+	Tests.append(Cyclic[i])
 
-
-InitialTime = time()
-for k in range(20):
-	print ""
 for Test in Tests:
-	global Faces
-	Faces = "Start"
-	global PointToIndexMap
-	PointToIndexMap = "Start"
-	Pts = Test[0]
-	print Test[1]
-	print Pts
-	StartTime = time()
-	GiftWrap(Pts)
-	print "Done with " + Test[1]
-	print "Time = ", time() - StartTime
+	print Test
+	GiftWrap(Test)
 	print ""
-	print ""
-print "Total time = ", time() - InitialTime

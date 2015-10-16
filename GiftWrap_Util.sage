@@ -316,7 +316,11 @@ def ConvexHull2d(Pts):
 		Pt2 = FindNextPt(Pts, Pt)
 		if Pt2 != Hull[0]:
 			Hull.append(Pt2)
-	return Hull
+	PtsToRemove = []
+	for Pt in Pts:
+		if Pt not in Hull:
+			PtsToRemove.append(Pt)
+	return Hull, PtsToRemove
 
 #-------------------------------------------------------------------------------
 def CreateCyclicLists(n):
@@ -333,3 +337,12 @@ def CreateCyclicLists(n):
 	mon2 = [1 for x in xrange(n)]
 	system.append([mon1,mon2])
 	return system
+
+#-------------------------------------------------------------------------------
+def RemovePts(PtIndicesToRemove, Pts, ShortPointToLongPointMap, LongPointToShortPointMap, IndexToPointMap):
+	for PtIndex in PtIndicesToRemove:
+		Pt = IndexToPointMap[PtIndex]
+		ShortPt = LongPointToShortPointMap.pop(tuple(Pt))
+		Pts.remove(ShortPt)
+		ShortPointToLongPointMap.pop(tuple(ShortPt))
+	return Pts, ShortPointToLongPointMap, LongPointToShortPointMap

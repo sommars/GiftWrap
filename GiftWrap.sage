@@ -36,7 +36,7 @@ def DoGiftWrap(Pts, InitialLongPointToShortPointMap = "Start", InitialShortPoint
 	if InitialDim == 2:
 		print "The points on the convex hull in the order in which they occur:"
 		FullDimPts = []
-		for Pt in ConvexHull2d(Pts):
+		for Pt in ConvexHull2d(Pts)[0]:
 			FullDimPts.append(ShortPointToLongPointMap[tuple(Pt)])
 		print FullDimPts
 		return

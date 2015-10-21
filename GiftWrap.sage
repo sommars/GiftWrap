@@ -180,13 +180,13 @@ def MakeFace(FacePts, Pts, LongPointToShortPointMap, ShortPointToLongPointMap, B
 		print "Internal error, dimension ", Dimension, " not expected in MakeFace."
 		raw_input()
 
-	FullDimVertices = []
-	for Vertex in NewFace.Vertices:
-		FullDimVertices.append(IndexToPointMap[Vertex])
 
-	Normal = GetNormalFromHNF(GetHNF(FullDimVertices))
 	global InitialDim
 	if Dimension == InitialDim - 1:
+		FullDimVertices = []
+		for Vertex in NewFace.Vertices:
+			FullDimVertices.append(IndexToPointMap[Vertex])
+		Normal = GetNormalFromHNF(GetHNF(FullDimVertices))
 		NewFace.InnerNormals = [MakeNormalPointInDirectionOfPt(Normal, Barycenter, FullDimVertices[0])]
 
 	for i in xrange(len(Faces[Dimension - 1])):
@@ -215,7 +215,7 @@ for i in xrange(1):
 
 
 """
-Cyclic = CreateCyclicLists(4)
+Cyclic = CreateCyclicLists(9)
 Tests = []
 for i in xrange(len(Cyclic)):
 	Tests.append(Cyclic[i])

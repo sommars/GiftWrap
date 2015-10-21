@@ -34,12 +34,12 @@ def DoGiftWrap(Pts, InitialLongPointToShortPointMap = "Start", InitialShortPoint
 			Faces.append([])
 	Barycenter = FindBarycenter(Pts)
 	if InitialDim == 2:
-		print "The points on the convex hull in the order in which they occur:"
+		#print "The points on the convex hull in the order in which they occur:"
 		FullDimPts = []
 		for Pt in ConvexHull2d(Pts)[0]:
 			FullDimPts.append(ShortPointToLongPointMap[tuple(Pt)])
-		print FullDimPts
-		return
+		#print FullDimPts
+		return FullDimPts
 	elif InitialDim == 1:
 		print "The points on the convex hull in the order in which they occur:"
 		FullDimPts = [ShortPointToLongPointMap[tuple(Pts[i])] for i in xrange(len(Pts))]
@@ -115,8 +115,16 @@ def DoGiftWrap(Pts, InitialLongPointToShortPointMap = "Start", InitialShortPoint
 			print "len(Vertices) = ", len(Vertices)
 			raw_input()
 		else:
+			for i in xrange(1,len(Faces)):
+				Index = len(Faces) - 1
+				for j in xrange(len(Faces[Index])):
+					Face = Faces[Index][j]
+					for Child in Face.Children:
+						Child = Faces[Index-1][Child] 
+						Child.Parents.add(j)
+						Child.InnerNormals += Face.InnerNormals
 			print "Euler characteristic passed for polytope that lives in dimension", LocalDim
-			return Faces, IndexToPointMap
+			return Faces, IndexToPointMap, PointToIndexMap
 	return FaceIndices, PtIndicesToRemove
 
 #-------------------------------------------------------------------------------
@@ -177,7 +185,9 @@ def MakeFace(FacePts, Pts, LongPointToShortPointMap, ShortPointToLongPointMap, B
 		FullDimVertices.append(IndexToPointMap[Vertex])
 
 	Normal = GetNormalFromHNF(GetHNF(FullDimVertices))
-	NewFace.InnerNormal = MakeNormalPointInDirectionOfPt(Normal, Barycenter, FullDimVertices[0])
+	global InitialDim
+	if Dimension == InitialDim - 1:
+		NewFace.InnerNormals = [MakeNormalPointInDirectionOfPt(Normal, Barycenter, FullDimVertices[0])]
 
 	for i in xrange(len(Faces[Dimension - 1])):
 		PossibleNeighbor = Faces[Dimension - 1][i]
@@ -200,16 +210,22 @@ def MakeRandomPointSet(Dim,Num):
 	return Pts
 
 Tests = []
-for i in xrange(6):
-	Tests.append(MakeRandomPointSet(6,10))
+for i in xrange(1):
+	Tests.append(MakeRandomPointSet(3,10))
 
 
-Cyclic = CreateCyclicLists(7)
+"""
+Cyclic = CreateCyclicLists(4)
 Tests = []
 for i in xrange(len(Cyclic)):
 	Tests.append(Cyclic[i])
 
+TotalTime = time()
 for Test in Tests:
 	print Test
+	StartTime = time()
 	GiftWrap(Test)
+	print time() - StartTime
 	print ""
+print time() - TotalTime
+"""

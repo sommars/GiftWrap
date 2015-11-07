@@ -116,7 +116,7 @@ def DoGiftWrap(Pts, InitialLongPointToShortPointMap = "Start", InitialShortPoint
 			raw_input()
 		else:
 			for i in xrange(1,len(Faces)):
-				Index = len(Faces) - 1
+				Index = len(Faces) - i
 				for j in xrange(len(Faces[Index])):
 					Face = Faces[Index][j]
 					for Child in Face.Children:

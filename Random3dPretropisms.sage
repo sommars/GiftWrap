@@ -27,15 +27,6 @@ def DoRandomPretropismTest(nvars):
 		HullInfoMap[(i,"Pts")] = Pts
 	HullTime = time() - HullTime
 	JeffStartTime = time()
-	"""
-	if nvars != 3:
-		print "UNSUPPORTED DIMENSION"
-		print "GFANTIME", GFanTime
-		print "HullTime", HullTime
-		print Rays
-		raw_input()
-		return
-	"""
 
 	ConeSet = set()
 	EdgePretropisms = []
@@ -111,36 +102,26 @@ def DoRandomPretropismTest(nvars):
 		#What we want here is a list of lists. Each element in the list should look like: (indextodimensiontolookinto, indextowhichelementinBFaces[i][?]
 
 		ACone = Cone(AEdge.InnerNormals)
-		#This only works in 3 dimensions, when IntersectingRefList is length 1
-		"""
-		for i in xrange(len(IntersectingRefList)):
-			for Face in IntersectingRefList[i]:
-				ConeSet.add(ACone.intersection(Cone(HullInfoMap[(i+1,"Faces")][Face[0]][Face[1]].InnerNormals)).rays())		
-		"""
-		Counter = 0
 		for Face in IntersectingRefList[0]:
-			NewCone = ACone.intersection(Cone(HullInfoMap[(1,"Faces")][Face[0]][Face[1]].InnerNormals))
-			if len(NewCone.rays()) == 0:
-				break
-			for Facetwo in IntersectingRefList[1]:
-				PossibleNewCone = NewCone.intersection(Cone(HullInfoMap[(2,"Faces")][Facetwo[0]][Facetwo[1]].InnerNormals))
-				if len(PossibleNewCone.rays()) == 0:
-					break
-				for Facethree in IntersectingRefList[2]:
-					Counter += 1
-					print Counter
-					PossibleNewConeTwo = PossibleNewCone.intersection(Cone(HullInfoMap[(3,"Faces")][Facethree[0]][Facethree[1]].InnerNormals))
-					if len(PossibleNewConeTwo.rays()) == 1:
-						ConeSet.add(PossibleNewCone)
+			ConeOne = ACone.intersection(Cone(HullInfoMap[(1,"Faces")][Face[0]][Face[1]].InnerNormals))
+			if len(ConeOne.rays()) != 0:
+				for Facetwo in IntersectingRefList[1]:
+					ConeTwo = ConeOne.intersection(Cone(HullInfoMap[(2,"Faces")][Facetwo[0]][Facetwo[1]].InnerNormals))
+					if len(ConeTwo.rays()) != 0:
+						for Facethree in IntersectingRefList[2]:
+							ConeThree = ConeTwo.intersection(Cone(HullInfoMap[(3,"Faces")][Facethree[0]][Facethree[1]].InnerNormals))
+							if len(ConeThree.rays()) == 1:
+								ConeSet.add(ConeThree.rays())
 
 
 #note, can extract the vectors doing something like NewCone.rays().matrix() (and would need to parse this sucker)
 	ConeList = list(ConeSet)
 	ConeList.sort()
 	for NewCone in ConeList:
-		print NewCone
+		print NewCone#, len(FindInitialForm(HullInfoMap[(0,"Pts")],NewRay)),len(FindInitialForm(HullInfoMap[(1,"Pts")],NewRay)),len(FindInitialForm(HullInfoMap[(2,"Pts")],NewRay)),len(FindInitialForm(HullInfoMap[(3,"Pts")],NewRay)),len(FindInitialForm(HullInfoMap[(4,"Pts")],NewRay))
 	for NewRay in Rays:
-		print NewRay
+		NewRay = [-NewRay[i] for i in xrange(len(NewRay))]
+		print NewRay, len(FindInitialForm(HullInfoMap[(0,"Pts")],NewRay)),len(FindInitialForm(HullInfoMap[(1,"Pts")],NewRay)),len(FindInitialForm(HullInfoMap[(2,"Pts")],NewRay)),len(FindInitialForm(HullInfoMap[(3,"Pts")],NewRay))
 	print "GFANTIME", GFanTime
 	print "HullTime", HullTime
 	print "JeffTime", time() - JeffStartTime

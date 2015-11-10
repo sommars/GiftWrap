@@ -123,8 +123,9 @@ def DoGiftWrap(Pts, InitialLongPointToShortPointMap = "Start", InitialShortPoint
 						Child = Faces[Index-1][Child] 
 						Child.Parents.add(j)
 						Child.InnerNormals += Face.InnerNormals
+			NecessaryVertices = [IndexToPointMap[Vertex] for Vertex in Vertices]
 			print "Euler characteristic passed for polytope that lives in dimension", LocalDim
-			return Faces, IndexToPointMap, PointToIndexMap
+			return Faces, IndexToPointMap, PointToIndexMap, NecessaryVertices
 	return FaceIndices, PtIndicesToRemove
 
 #-------------------------------------------------------------------------------
@@ -211,14 +212,15 @@ def MakeRandomPointSet(Dim,Num):
 
 Tests = []
 for i in xrange(1):
-	Tests.append(MakeRandomPointSet(3,10))
+	Tests.append(MakeRandomPointSet(5,6))
 
-
+#NOTE TO SELF: If I don't have a full dimensional polytope, the inner normals I have are incomplete.
 """
-Cyclic = CreateCyclicLists(9)
+Cyclic = CreateCyclicLists(8)
 Tests = []
 for i in xrange(len(Cyclic)):
 	Tests.append(Cyclic[i])
+
 
 TotalTime = time()
 for Test in Tests:

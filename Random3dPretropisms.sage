@@ -1,6 +1,19 @@
 load("Pretropism_Util.sage")
 from time import time
 def DoRandomPretropismTest(nvars):
+	def IntersectCones(Index, NewCone):
+		global ConeSet
+		global IntersectingRefList
+		global HullInfoMap
+		Faces = HullInfoMap[(Index + 1,"Faces")]
+		for i in IntersectingRefList[Index]:
+			TempCone = NewCone.intersection(Cone(Faces[i[0]][i[1]].InnerNormals))
+			if TempCone.dim() > 0:
+				if Index == len(IntersectingRefList) - 1 and len(TempCone.rays()) == 1:
+					ConeSet.add(TempCone.rays())
+				else:
+					IntersectCones(Index+1,TempCone)
+		return
 	PolyString = ""
 	for i in xrange(nvars - 1):
 		PolyString += "x_" + str(i) + ','
@@ -16,6 +29,7 @@ def DoRandomPretropismTest(nvars):
 
 	PolysAsPts = [[[Integer(j) for j in i] for i in Poly.exponents()] for Poly in Polys]
 
+	global HullInfoMap
 	HullInfoMap = {}
 	HullTime = time()
 	for i in xrange(len(PolysAsPts)):
@@ -28,6 +42,7 @@ def DoRandomPretropismTest(nvars):
 	HullTime = time() - HullTime
 	JeffStartTime = time()
 
+	global ConeSet
 	ConeSet = set()
 	EdgePretropisms = []
 	AFaces = HullInfoMap[(0,"Faces")]
@@ -40,6 +55,7 @@ def DoRandomPretropismTest(nvars):
 		return
 
 	for AEdge in AFaces[0]:
+		global IntersectingRefList
 		IntersectingRefList = []
 		Normal = [AEdge.InnerNormals[0][i] + AEdge.InnerNormals[1][i] for i in xrange(len(AEdge.InnerNormals[0]))]
 		for PolytopeIndex in xrange(1,len(PolysAsPts)):
@@ -83,7 +99,6 @@ def DoRandomPretropismTest(nvars):
 
 
 			#We need to test if all of these edges make up a facet.
-
 			IndexOfIntRefList = len(IntersectingRefList)
 			IntersectingRefList.append([])
 
@@ -98,30 +113,19 @@ def DoRandomPretropismTest(nvars):
 					PretropEdges = PretropEdges.difference(BFaces[BFacesIndex][Face].Children)
 			for Edge in PretropEdges:
 				IntersectingRefList[IndexOfIntRefList].append((0,Edge))
-		#This should happen down a level.
+
 		#What we want here is a list of lists. Each element in the list should look like: (indextodimensiontolookinto, indextowhichelementinBFaces[i][?]
 
 		ACone = Cone(AEdge.InnerNormals)
-		for Face in IntersectingRefList[0]:
-			ConeOne = ACone.intersection(Cone(HullInfoMap[(1,"Faces")][Face[0]][Face[1]].InnerNormals))
-			if len(ConeOne.rays()) != 0:
-				for Facetwo in IntersectingRefList[1]:
-					ConeTwo = ConeOne.intersection(Cone(HullInfoMap[(2,"Faces")][Facetwo[0]][Facetwo[1]].InnerNormals))
-					if len(ConeTwo.rays()) != 0:
-						for Facethree in IntersectingRefList[2]:
-							ConeThree = ConeTwo.intersection(Cone(HullInfoMap[(3,"Faces")][Facethree[0]][Facethree[1]].InnerNormals))
-							if len(ConeThree.rays()) == 1:
-								ConeSet.add(ConeThree.rays())
+		IntersectCones(0, ACone)
 
-
-#note, can extract the vectors doing something like NewCone.rays().matrix() (and would need to parse this sucker)
 	ConeList = list(ConeSet)
 	ConeList.sort()
 	for NewCone in ConeList:
 		print NewCone#, len(FindInitialForm(HullInfoMap[(0,"Pts")],NewRay)),len(FindInitialForm(HullInfoMap[(1,"Pts")],NewRay)),len(FindInitialForm(HullInfoMap[(2,"Pts")],NewRay)),len(FindInitialForm(HullInfoMap[(3,"Pts")],NewRay)),len(FindInitialForm(HullInfoMap[(4,"Pts")],NewRay))
 	for NewRay in Rays:
 		NewRay = [-NewRay[i] for i in xrange(len(NewRay))]
-		print NewRay, len(FindInitialForm(HullInfoMap[(0,"Pts")],NewRay)),len(FindInitialForm(HullInfoMap[(1,"Pts")],NewRay)),len(FindInitialForm(HullInfoMap[(2,"Pts")],NewRay)),len(FindInitialForm(HullInfoMap[(3,"Pts")],NewRay))
+		print NewRay#, len(FindInitialForm(HullInfoMap[(0,"Pts")],NewRay)),len(FindInitialForm(HullInfoMap[(1,"Pts")],NewRay)),len(FindInitialForm(HullInfoMap[(2,"Pts")],NewRay)),len(FindInitialForm(HullInfoMap[(3,"Pts")],NewRay))
 	print "GFANTIME", GFanTime
 	print "HullTime", HullTime
 	print "JeffTime", time() - JeffStartTime

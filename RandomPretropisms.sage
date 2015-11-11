@@ -10,7 +10,8 @@ def DoRandomPretropismTest(nvars):
 			TempCone = NewCone.intersection(Cone(Faces[i[0]][i[1]].InnerNormals))
 			if TempCone.dim() > 0:
 				if Index == len(IntersectingRefList) - 1 and len(TempCone.rays()) == 1:
-					ConeSet.add(TempCone.rays())
+					for Ray in TempCone.rays():
+						ConeSet.add(tuple(Ray.list()))
 				else:
 					IntersectCones(Index+1,TempCone)
 		return
@@ -121,14 +122,21 @@ def DoRandomPretropismTest(nvars):
 
 	ConeList = list(ConeSet)
 	ConeList.sort()
+	for i in xrange(len(Rays)):
+		Rays[i] = [-Rays[i][j] for j in xrange(len(Rays[i]))]
+	Rays.sort()
 	for NewCone in ConeList:
-		print NewCone#, len(FindInitialForm(HullInfoMap[(0,"Pts")],NewRay)),len(FindInitialForm(HullInfoMap[(1,"Pts")],NewRay)),len(FindInitialForm(HullInfoMap[(2,"Pts")],NewRay)),len(FindInitialForm(HullInfoMap[(3,"Pts")],NewRay)),len(FindInitialForm(HullInfoMap[(4,"Pts")],NewRay))
+		print list(NewCone)
 	for NewRay in Rays:
-		NewRay = [-NewRay[i] for i in xrange(len(NewRay))]
-		print NewRay#, len(FindInitialForm(HullInfoMap[(0,"Pts")],NewRay)),len(FindInitialForm(HullInfoMap[(1,"Pts")],NewRay)),len(FindInitialForm(HullInfoMap[(2,"Pts")],NewRay)),len(FindInitialForm(HullInfoMap[(3,"Pts")],NewRay))
+		print NewRay
+	if len(ConeList) == len(Rays):
+		print "Lists are same length"
+		for i in xrange(len(ConeList)):
+			if list(ConeList[i]) != Rays[i]:
+				print "UNEQUAL!", Rays[i], ConeList[i]
+	else:
+		print "Lists are unequal lengths", len(ConeList), len(Rays)
 	print "GFANTIME", GFanTime
 	print "HullTime", HullTime
 	print "JeffTime", time() - JeffStartTime
-	return len(ConeList), len(Rays)
-	
-	
+	return

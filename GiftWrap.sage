@@ -16,12 +16,12 @@ def DoGiftWrap(Pts, InitialLongPointToShortPointMap = "Start", InitialShortPoint
 	if not PtsAreValid(Pts):
 		print "The input set of points is not valid."
 		raw_input()
-		return
+		return 0, 0 , 0, 0
 	Pts = RemoveDups(Pts)
 	if len(Pts) < 2:
 		print "The point on the convex hull:"
 		print Pts[0]
-		return
+		return 0, 0 , 0, 0
 	if PointToIndexMap == "Start":
 		PointToIndexMap, IndexToPointMap = MakeIndexMaps(Pts)
 
@@ -39,13 +39,13 @@ def DoGiftWrap(Pts, InitialLongPointToShortPointMap = "Start", InitialShortPoint
 		for Pt in ConvexHull2d(Pts)[0]:
 			FullDimPts.append(ShortPointToLongPointMap[tuple(Pt)])
 		#print FullDimPts
-		return FullDimPts
+		return 0, 0 , 0, 0
 	elif InitialDim == 1:
 		print "The points on the convex hull in the order in which they occur:"
 		FullDimPts = [ShortPointToLongPointMap[tuple(Pts[i])] for i in xrange(len(Pts))]
 		FullDimPts.sort()
 		print FullDimPts[0], FullDimPts[1]
-		return
+		return 0, 0 , 0, 0
 	FirstPts = FindInitialFacet(Pts)
 	IndexOfFirstFace, PtIndicesToRemove = MakeFace(FirstPts, Pts, LongPointToShortPointMap, ShortPointToLongPointMap, Barycenter, LocalDim - 1)
 	Pts, ShortPointToLongPointMap, LongPointToShortPointMap = RemovePts(PtIndicesToRemove, Pts, ShortPointToLongPointMap, LongPointToShortPointMap, IndexToPointMap)
@@ -54,7 +54,7 @@ def DoGiftWrap(Pts, InitialLongPointToShortPointMap = "Start", InitialShortPoint
 	for ChildEdge in Faces[LocalDim-2][IndexOfFirstFace].Children:
 		EdgesToRotateOver.add((IndexOfFirstFace, ChildEdge))
 	Counter = 0
-	MaxCounter = 400
+	MaxCounter = 4000
 	#Something like this: MaxCounter = len(Combinations(len(Pts),LocalDim).list())
 	while len(EdgesToRotateOver) > 0:
 		if Counter == MaxCounter:

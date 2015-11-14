@@ -1,14 +1,14 @@
 from time import time
 load("GiftWrap_Util.sage")
 
-def GiftWrap(Pts):
+def GiftWrap(Pts,Silent=False):
 	global Faces
 	Faces = "Start"
 	global PointToIndexMap
 	PointToIndexMap = "Start"
-	return DoGiftWrap(Pts)
+	return DoGiftWrap(Pts, Silent)
 
-def DoGiftWrap(Pts, InitialLongPointToShortPointMap = "Start", InitialShortPointToLongPointMap = "Start"):
+def DoGiftWrap(Pts, Silent, InitialLongPointToShortPointMap = "Start", InitialShortPointToLongPointMap = "Start"):
 	global Faces
 	global PointToIndexMap
 	global IndexToPointMap
@@ -41,13 +41,15 @@ def DoGiftWrap(Pts, InitialLongPointToShortPointMap = "Start", InitialShortPoint
 		#print FullDimPts
 		return 0, 0 , 0, 0
 	elif InitialDim == 1:
-		print "The points on the convex hull in the order in which they occur:"
+		if Silent != True:
+			print "The points on the convex hull in the order in which they occur:"
 		FullDimPts = [ShortPointToLongPointMap[tuple(Pts[i])] for i in xrange(len(Pts))]
 		FullDimPts.sort()
-		print FullDimPts[0], FullDimPts[1]
+		if Silent != True:
+			print FullDimPts[0], FullDimPts[1]
 		return 0, 0 , 0, 0
 	FirstPts = FindInitialFacet(Pts)
-	IndexOfFirstFace, PtIndicesToRemove = MakeFace(FirstPts, Pts, LongPointToShortPointMap, ShortPointToLongPointMap, Barycenter, LocalDim - 1)
+	IndexOfFirstFace, PtIndicesToRemove = MakeFace(FirstPts, Pts, LongPointToShortPointMap, ShortPointToLongPointMap, Barycenter, LocalDim - 1,Silent)
 	Pts, ShortPointToLongPointMap, LongPointToShortPointMap = RemovePts(PtIndicesToRemove, Pts, ShortPointToLongPointMap, LongPointToShortPointMap, IndexToPointMap)
 	FaceIndices = set([IndexOfFirstFace])
 	EdgesToRotateOver = set([])
@@ -78,7 +80,7 @@ def DoGiftWrap(Pts, InitialLongPointToShortPointMap = "Start", InitialShortPoint
 
 		FacePts = EdgePts + FindNewFacePtsFromEdge(Pts, EdgePts, InnerNormal, VerticesToUse)[0]
 		#Call MakeFace on the points I've found and do some bookkeeping
-		NewFaceIndex, PtIndicesToRemove = MakeFace(FacePts, Pts, LongPointToShortPointMap, ShortPointToLongPointMap, Barycenter, LocalDim - 1)
+		NewFaceIndex, PtIndicesToRemove = MakeFace(FacePts, Pts, LongPointToShortPointMap, ShortPointToLongPointMap, Barycenter, LocalDim - 1,Silent)
 		Pts, ShortPointToLongPointMap, LongPointToShortPointMap = RemovePts(PtIndicesToRemove, Pts, ShortPointToLongPointMap, LongPointToShortPointMap, IndexToPointMap)
 		if NewFaceIndex not in FaceIndices:
 			EdgesToRotateOver.add(Edge)
@@ -109,7 +111,8 @@ def DoGiftWrap(Pts, InitialLongPointToShortPointMap = "Start", InitialShortPoint
 		FaceSum = 0
 		for i in xrange(len(Faces)):
 			FaceSum += (-1)^(i+1)*len(Faces[i])
-		PrintFaceLens()
+		if Silent != True:
+			PrintFaceLens()
 		if len(Vertices) + FaceSum != (-1)^(InitialDim+1) + 1:
 			print "Euler characteristic failed for polytope that lives in dimension", LocalDim
 			print "len(Vertices) = ", len(Vertices)
@@ -124,12 +127,13 @@ def DoGiftWrap(Pts, InitialLongPointToShortPointMap = "Start", InitialShortPoint
 						Child.Parents.add(j)
 						Child.InnerNormals += Face.InnerNormals
 			NecessaryVertices = [IndexToPointMap[Vertex] for Vertex in Vertices]
-			print "Euler characteristic passed for polytope that lives in dimension", LocalDim
+			if Silent != True:
+				print "Euler characteristic passed for polytope that lives in dimension", LocalDim
 			return Faces, IndexToPointMap, PointToIndexMap, NecessaryVertices
 	return FaceIndices, PtIndicesToRemove
 
 #-------------------------------------------------------------------------------
-def MakeFace(FacePts, Pts, LongPointToShortPointMap, ShortPointToLongPointMap, Barycenter, Dimension):
+def MakeFace(FacePts, Pts, LongPointToShortPointMap, ShortPointToLongPointMap, Barycenter, Dimension,Silent):
 	#Check if this face has already been defined
 	PtIndexSet = set([PointToIndexMap[tuple(ShortPointToLongPointMap[tuple(FacePts[i])])] for i in xrange(len(FacePts))])
 	for i in xrange(len(Faces[Dimension-1])):
@@ -174,7 +178,7 @@ def MakeFace(FacePts, Pts, LongPointToShortPointMap, ShortPointToLongPointMap, B
 						PossibleNeighbor.Neighbors.add((len(Faces[0])-1,list(PossibleNeighbor.Vertices.intersection(EdgeFace.Vertices))[0]))
 						EdgeFace.Neighbors.add((i,list(PossibleNeighbor.Vertices.intersection(EdgeFace.Vertices))[0]))
 	elif Dimension > 2:
-		NewFace.Children, PtIndicesToRemove = DoGiftWrap(FacePts, LongPointToShortPointMap, ShortPointToLongPointMap)
+		NewFace.Children, PtIndicesToRemove = DoGiftWrap(FacePts, Silent, LongPointToShortPointMap, ShortPointToLongPointMap)
 		for ChildFaceIndex in NewFace.Children:
 			NewFace.Vertices = NewFace.Vertices.union(Faces[Dimension-2][ChildFaceIndex].Vertices)
 	else:

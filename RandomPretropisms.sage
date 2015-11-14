@@ -1,10 +1,5 @@
 load("Pretropism_Util.sage")
 from time import time
-global HighestExp
-HighestExp = 100
-global NumberOfTerms
-NumberOfTerms = 10
-
 #-------------------------------------------------------------------------------
 def DoTests(nvars):
 	PolyString = ""
@@ -12,6 +7,8 @@ def DoTests(nvars):
 		PolyString += "x_" + str(i) + ','
 	PolyString += "x_" + str(nvars - 1)
 	R = PolynomialRing(QQ, nvars, PolyString)
+	HighestExp = 100
+	NumberOfTerms = 10
 	Polys = [R.random_element(HighestExp,NumberOfTerms) for i in xrange(nvars-1)]
 	for i in xrange(len(Polys)):
 		print "Polynomial",  i, " is ", Polys[i]
@@ -24,24 +21,26 @@ def DoTests(nvars):
 	PtsList = []
 	for i in xrange(len(PolysAsPts)):
 		print PolysAsPts[i]
-		Faces, IndexToPointMap, PointToIndexMap, Pts = GiftWrap(PolysAsPts[i])
+		Faces, IndexToPointMap, PointToIndexMap, Pts = GiftWrap(PolysAsPts[i],True)
 		HullInfoMap[(i,"Faces")] = Faces
 		HullInfoMap[(i,"IndexToPointMap")] = IndexToPointMap
 		HullInfoMap[(i,"PointToIndexMap")] = PointToIndexMap
 		HullInfoMap[(i,"Pts")] = Pts
 		PtsList.append(Pts)
 		if Faces == 0 or len(Faces) != nvars - 1:
+			print "Not all polytopes are the same dimension"
 			return 0, 0
 	HullTime = time() - HullTime
 	for i in xrange(5):
 		print ""
 	print "ConvexHullTime", HullTime
+	print ""
 
 	DoGfan(Polys,R)
-	DoRandomPretropismTest(PolysAsPts, HullInfoMap)
-	DoMinkowskiSum(Polys, PtsList)
+	#DoRandomPretropismTest(PolysAsPts, HullInfoMap)
+	#DoMinkowskiSum(Polys, PtsList)
 	DoCayleyPolytope(PtsList)
-	DoNaiveAlgorithm(HullInfoMap)
+	#DoNaiveAlgorithm(HullInfoMap)
 	return
 
 
@@ -166,7 +165,7 @@ def DoMinkowskiSum(Polys, PtsList):
 		ProdPoly = ProdPoly*Poly
 	ProdPolysAsPts = [[Integer(j) for j in i] for i in ProdPoly.exponents()]
 
-	Faces, IndexToPointMap, PointToIndexMap, Pts = GiftWrap(ProdPolysAsPts)
+	Faces, IndexToPointMap, PointToIndexMap, Pts = GiftWrap(ProdPolysAsPts,True)
 	Normals = []
 	for Face in Faces[len(Faces)- 1]:
 		Normals.append(Face.InnerNormals[0])
@@ -197,13 +196,30 @@ def DoCayleyPolytope(PtsList):
 		for j in xrange(len(NewPtSet[j])):
 			NewPtSet[i][j] = Integer(NewPtSet[i][j])
 
-	Faces, IndexToPointMap, PointToIndexMap, Pts = GiftWrap(NewPtSet)
+	Faces, IndexToPointMap, PointToIndexMap, Pts = GiftWrap(NewPtSet,True)
+
+	print "PTSLIST BELOW"
+	print PtsList[0]
+	print PtsList[1]
 	NormalList = []
 	for Face in Faces[len(Faces) - 1]:
-		NormalList.append(Face.InnerNormals[0])
+		VertexList = []
+		for Pt in Face.Vertices:
+			VertexList.append(IndexToPointMap[Pt][:-1])
+		Count1 = 0
+		Count2 = 0
+		for Vertex in VertexList:
+			if Vertex in PtsList[0]:
+				Count1 += 1
+			if Vertex in PtsList[1]:
+				Count2 += 1
+		if Count1 > 1 and Count2 > 1:
+			NormalList.append(Face.InnerNormals[0])
 	NormalList.sort()
 
-
+	print "GFANRAYS"
+	for Ray in Rays:
+		print Ray
 	print ""
 	for Normal in NormalList:
 		print Normal
@@ -220,8 +236,8 @@ def DoGfan(Polys, R):
 		Rays[i] = [-Rays[i][j] for j in xrange(len(Rays[i]))]
 	Rays.sort()
 	GfanTime = time() - starttime
-	print "Gfan found", len(Rays), "rays."
 	print "Gfan took", GfanTime, "seconds."
+	print "Gfan found", len(Rays), "rays."
 	return
 	
 #-------------------------------------------------------------------------------

@@ -1,6 +1,53 @@
 load("Pretropism_Util.sage")
 from time import time
-def DoRandomPretropismTest(nvars):
+global HighestExp
+HighestExp = 100
+global NumberOfTerms
+NumberOfTerms = 10
+
+#-------------------------------------------------------------------------------
+def DoTests(nvars):
+	PolyString = ""
+	for i in xrange(nvars - 1):
+		PolyString += "x_" + str(i) + ','
+	PolyString += "x_" + str(nvars - 1)
+	R = PolynomialRing(QQ, nvars, PolyString)
+	Polys = [R.random_element(HighestExp,NumberOfTerms) for i in xrange(nvars-1)]
+	for i in xrange(len(Polys)):
+		print "Polynomial",  i, " is ", Polys[i]
+	PolysAsPts = [[[Integer(j) for j in i] for i in Poly.exponents()] for Poly in Polys]
+
+
+	global HullInfoMap
+	HullInfoMap = {}
+	HullTime = time()
+	PtsList = []
+	for i in xrange(len(PolysAsPts)):
+		print PolysAsPts[i]
+		Faces, IndexToPointMap, PointToIndexMap, Pts = GiftWrap(PolysAsPts[i])
+		HullInfoMap[(i,"Faces")] = Faces
+		HullInfoMap[(i,"IndexToPointMap")] = IndexToPointMap
+		HullInfoMap[(i,"PointToIndexMap")] = PointToIndexMap
+		HullInfoMap[(i,"Pts")] = Pts
+		PtsList.append(Pts)
+		if Faces == 0 or len(Faces) != nvars - 1:
+			return 0, 0
+	HullTime = time() - HullTime
+	for i in xrange(5):
+		print ""
+	print "ConvexHullTime", HullTime
+
+	DoGfan(Polys,R)
+	DoRandomPretropismTest(PolysAsPts, HullInfoMap)
+	DoMinkowskiSum(Polys, PtsList)
+	DoCayleyPolytope(PtsList)
+	DoNaiveAlgorithm(HullInfoMap)
+	return
+
+
+
+#-------------------------------------------------------------------------------
+def DoRandomPretropismTest(PolysAsPts, HullInfoMap):
 	def IntersectCones(Index, NewCone):
 		global ConeSet
 		global IntersectingRefList
@@ -9,39 +56,14 @@ def DoRandomPretropismTest(nvars):
 		for i in IntersectingRefList[Index]:
 			TempCone = NewCone.intersection(Cone(Faces[i[0]][i[1]].InnerNormals))
 			if TempCone.dim() > 0:
-				if Index == len(IntersectingRefList) - 1 and len(TempCone.rays()) == 1:
-					for Ray in TempCone.rays():
-						ConeSet.add(tuple(Ray.list()))
+				if Index == len(IntersectingRefList) - 1:
+					if len(TempCone.rays()) == 1:
+						for Ray in TempCone.rays():
+							ConeSet.add(tuple(Ray.list()))
 				else:
 					IntersectCones(Index+1,TempCone)
 		return
-	PolyString = ""
-	for i in xrange(nvars - 1):
-		PolyString += "x_" + str(i) + ','
-	PolyString += "x_" + str(nvars - 1)
-	R = PolynomialRing(QQ, nvars, PolyString)
-	Polys = [R.random_element(100,10) for i in xrange(nvars-1)]
-
-	for i in xrange(len(Polys)):
-		print "Polynomial",  i, " is ", Polys[i]
-	starttime = time()
-	Rays = R.ideal(Polys).groebner_fan().tropical_intersection().rays()
-	GFanTime = time() - starttime
-
-	PolysAsPts = [[[Integer(j) for j in i] for i in Poly.exponents()] for Poly in Polys]
-
-	global HullInfoMap
-	HullInfoMap = {}
-	HullTime = time()
-	for i in xrange(len(PolysAsPts)):
-		print PolysAsPts[i]
-		Faces, IndexToPointMap, PointToIndexMap, Pts = GiftWrap(PolysAsPts[i])
-		HullInfoMap[(i,"Faces")] = Faces
-		HullInfoMap[(i,"IndexToPointMap")] = IndexToPointMap
-		HullInfoMap[(i,"PointToIndexMap")] = PointToIndexMap
-		HullInfoMap[(i,"Pts")] = Pts
-	HullTime = time() - HullTime
-	JeffStartTime = time()
+	NewAlgStart = time()
 
 	global ConeSet
 	ConeSet = set()
@@ -58,7 +80,9 @@ def DoRandomPretropismTest(nvars):
 	for AEdge in AFaces[0]:
 		global IntersectingRefList
 		IntersectingRefList = []
-		Normal = [AEdge.InnerNormals[0][i] + AEdge.InnerNormals[1][i] for i in xrange(len(AEdge.InnerNormals[0]))]
+		Normal = [0 for i in xrange(len(AEdge.InnerNormals[0]))]
+		for InnerNormal in AEdge.InnerNormals:
+			Normal = [Normal[i] + InnerNormal[i] for i in xrange(len(Normal))]
 		for PolytopeIndex in xrange(1,len(PolysAsPts)):
 			BFaces = HullInfoMap[(PolytopeIndex,"Faces")]
 			BIndexToPointMap =	HullInfoMap[(PolytopeIndex,"IndexToPointMap")]
@@ -97,8 +121,6 @@ def DoRandomPretropismTest(nvars):
 				else:
 					NotPretropEdges.add(TestEdge)
 
-
-
 			#We need to test if all of these edges make up a facet.
 			IndexOfIntRefList = len(IntersectingRefList)
 			IntersectingRefList.append([])
@@ -122,21 +144,87 @@ def DoRandomPretropismTest(nvars):
 
 	ConeList = list(ConeSet)
 	ConeList.sort()
-	for i in xrange(len(Rays)):
-		Rays[i] = [-Rays[i][j] for j in xrange(len(Rays[i]))]
-	Rays.sort()
-	for NewCone in ConeList:
-		print list(NewCone)
-	for NewRay in Rays:
-		print NewRay
+	global Rays
 	if len(ConeList) == len(Rays):
-		print "Lists are same length"
 		for i in xrange(len(ConeList)):
 			if list(ConeList[i]) != Rays[i]:
 				print "UNEQUAL!", Rays[i], ConeList[i]
+				return 0, 0
 	else:
 		print "Lists are unequal lengths", len(ConeList), len(Rays)
-	print "GFANTIME", GFanTime
-	print "HullTime", HullTime
-	print "JeffTime", time() - JeffStartTime
+		return 0, 0
+
+	print "NewAlg took", time() - NewAlgStart, "seconds."
+	print "NewAlg found", len(ConeList), "rays."
+	return# len(ConeList), time() - NewAlgStart#, len(HullInfoMap[(0,"Faces")][0]), len(HullInfoMap[(1,"Faces")][0]), len(HullInfoMap[(2,"Faces")][0])
+	
+#-------------------------------------------------------------------------------
+def DoMinkowskiSum(Polys, PtsList):
+	MinkowskiStart = time()
+	ProdPoly = 1
+	for Poly in Polys:
+		ProdPoly = ProdPoly*Poly
+	ProdPolysAsPts = [[Integer(j) for j in i] for i in ProdPoly.exponents()]
+
+	Faces, IndexToPointMap, PointToIndexMap, Pts = GiftWrap(ProdPolysAsPts)
+	Normals = []
+	for Face in Faces[len(Faces)- 1]:
+		Normals.append(Face.InnerNormals[0])
+	Counter = 0
+	for Normal in Normals:
+		ShouldIncCounter = True
+		for Pts in PtsList:
+			if len(FindInitialForm(Pts, Normal)) < 2:
+				ShouldIncCounter = False
+				break
+		if ShouldIncCounter == True:
+			Counter += 1
+	print "Minkowski took", time() - MinkowskiStart, "seconds."
+	print "Minkowski found", Counter, "rays."
+	return
+
+#-------------------------------------------------------------------------------
+def DoCayleyPolytope(PtsList):
+	CayleyStart = time()
+	NewPtSet = []
+	
+	#This works in 3d, but not in nd
+	for i in xrange(len(PtsList)):
+		for j in xrange(len(PtsList[i])):
+			NewPtSet.append(PtsList[i][j] +[i])
+	print NewPtSet
+	for i in xrange(len(NewPtSet)):
+		for j in xrange(len(NewPtSet[j])):
+			NewPtSet[i][j] = Integer(NewPtSet[i][j])
+
+	Faces, IndexToPointMap, PointToIndexMap, Pts = GiftWrap(NewPtSet)
+	NormalList = []
+	for Face in Faces[len(Faces) - 1]:
+		NormalList.append(Face.InnerNormals[0])
+	NormalList.sort()
+
+
+	print ""
+	for Normal in NormalList:
+		print Normal
+	print "Cayley found", len(NormalList), "rays."
+	print "CayleyTime", time() - CayleyStart
+	return 
+
+#-------------------------------------------------------------------------------
+def DoGfan(Polys, R):
+	starttime = time()
+	global Rays
+	Rays = R.ideal(Polys).groebner_fan().tropical_intersection().rays()
+	for i in xrange(len(Rays)):
+		Rays[i] = [-Rays[i][j] for j in xrange(len(Rays[i]))]
+	Rays.sort()
+	GfanTime = time() - starttime
+	print "Gfan found", len(Rays), "rays."
+	print "Gfan took", GfanTime, "seconds."
+	return
+	
+#-------------------------------------------------------------------------------
+def DoNaiveAlgorithm(HullInfoMap):
+	print "Naive algorithm not yet implemented."
 	return

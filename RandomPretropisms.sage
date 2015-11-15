@@ -8,7 +8,7 @@ def DoTests(nvars):
 	PolyString += "x_" + str(nvars - 1)
 	R = PolynomialRing(QQ, nvars, PolyString)
 	HighestExp = 100
-	NumberOfTerms = 10
+	NumberOfTerms = 15
 	Polys = [R.random_element(HighestExp,NumberOfTerms) for i in xrange(nvars-1)]
 
 	for i in xrange(len(Polys)):
@@ -31,19 +31,19 @@ def DoTests(nvars):
 		if Faces == 0 or len(Faces) != nvars - 1:
 			print "Not all polytopes are the same dimension"
 			return 0, 0
+
+	print ""
 	HullTime = time() - HullTime
 	print "ConvexHullTime", HullTime
-	print ""
-	
 	DoGfan(Polys,R)
-	DoRandomPretropismTest(PolysAsPts, HullInfoMap)
-	DoMinkowskiSum(Polys, PtsList)
-	DoCayleyPolytope(PtsList)
-	DoNaiveAlgorithm(HullInfoMap)
+	DoNewAlgorithm(PolysAsPts, HullInfoMap)
+	#DoMinkowskiSum(Polys, PtsList)
+	#DoCayleyPolytope(PtsList)
+	DoNaiveAlgorithm(HullInfoMap, nvars - 1)
 	return
 
 #-------------------------------------------------------------------------------
-def DoRandomPretropismTest(PolysAsPts, HullInfoMap):
+def DoNewAlgorithm(PolysAsPts, HullInfoMap):
 	def IntersectCones(Index, NewCone):
 		global ConeSet
 		global IntersectingRefList
@@ -215,39 +215,44 @@ def DoCayleyPolytope(PtsList):
 		if ShouldAddNormal == True:
 			NormalList.append(Face.InnerNormals[0][0:Dim])
 
-	print "Cayley took ", time() - CayleyStart, "seconds."
+	print "Cayley took", time() - CayleyStart, "seconds."
 	print "Cayley found", len(NormalList), "rays."
 	return 
 
 #-------------------------------------------------------------------------------
 def DoGfan(Polys, R):
-	starttime = time()
+	StartTime = time()
 	global Rays
 	Rays = R.ideal(Polys).groebner_fan().tropical_intersection().rays()
 	for i in xrange(len(Rays)):
 		Rays[i] = [-Rays[i][j] for j in xrange(len(Rays[i]))]
 	Rays.sort()
-	GfanTime = time() - starttime
-	print "Gfan took", GfanTime, "seconds."
+	print "Gfan took", time() - StartTime, "seconds."
 	print "Gfan found", len(Rays), "rays."
 	return
 
 #-------------------------------------------------------------------------------
-def DoNaiveAlgorithm(HullInfoMap):
-	def IntersectCones(Index, NewCone):
+def DoNaiveAlgorithm(HullInfoMap, NumberOfPolytopes):
+	def IntersectCones(Index, NewCone, NumberOfPolytopes):
 		global ConeSet
-		global IntersectingRefList
 		global HullInfoMap
 		Faces = HullInfoMap[(Index + 1,"Faces")]
-		for i in IntersectingRefList[Index]:
-			TempCone = NewCone.intersection(Cone(Faces[i[0]][i[1]].InnerNormals))
+		for i in xrange(len(Faces[0])):
+			TempCone = NewCone.intersection(Cone(Faces[0][i].InnerNormals))
 			if TempCone.dim() > 0:
-				if Index == len(IntersectingRefList) - 1:
+				if Index == NumberOfPolytopes - 2:
 					if len(TempCone.rays()) == 1:
 						for Ray in TempCone.rays():
 							ConeSet.add(tuple(Ray.list()))
 				else:
-					IntersectCones(Index+1,TempCone)
+					IntersectCones(Index+1, TempCone, NumberOfPolytopes)
 		return
-	#for Edge
+
+	StartTime = time()
+	AFaces = HullInfoMap[(0,"Faces")]
+	for i in xrange(len(AFaces[0])):
+		IntersectCones(0, Cone(AFaces[0][i].InnerNormals), NumberOfPolytopes)
+	
+	print "Naive algorithm took", time() - StartTime, "seconds."
+	print "Naive algorithm found", len(Rays), "rays."
 	return

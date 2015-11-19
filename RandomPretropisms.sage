@@ -1,5 +1,28 @@
 load("Pretropism_Util.sage")
 from time import time
+def NumberEdgesCorrespondsToPretropisms(nvars,NumberOfTerms):
+	PolyString = ""
+	for i in xrange(nvars - 1):
+		PolyString += "x_" + str(i) + ','
+	PolyString += "x_" + str(nvars - 1)
+	R = PolynomialRing(QQ, nvars, PolyString)
+	HighestExp = 30
+	Polys = [R.random_element(HighestExp,NumberOfTerms) for i in xrange(nvars-1)]
+	PolysAsPts = [[[Integer(j) for j in i] for i in Poly.exponents()] for Poly in Polys]
+	
+	try:
+		Rays = R.ideal(Polys).groebner_fan().tropical_intersection().rays()
+	except:
+		print '[' + str(nvars) + ',0,0]'
+
+		return '0'
+
+	EdgeProd = 1
+	for Poly in PolysAsPts:
+		EdgeProd*=len(Polyhedron(Poly).faces(1))
+	print '[' + str(nvars) + ',' + str(len(Rays)) + ',' + str(EdgeProd) + ']'
+	return '[' + str(nvars) + ',' + str(len(Rays)) + ',' + str(EdgeProd) + ']'
+
 #-------------------------------------------------------------------------------
 def DoTests(nvars):
 	PolyString = ""
@@ -7,7 +30,7 @@ def DoTests(nvars):
 		PolyString += "x_" + str(i) + ','
 	PolyString += "x_" + str(nvars - 1)
 	R = PolynomialRing(QQ, nvars, PolyString)
-	HighestExp = 1000
+	HighestExp = 30
 	NumberOfTerms = 15
 	Polys = [R.random_element(HighestExp,NumberOfTerms) for i in xrange(nvars-1)]
 
@@ -15,7 +38,7 @@ def DoTests(nvars):
 		print "Polynomial",  i, " is ", Polys[i]
 	PolysAsPts = [[[Integer(j) for j in i] for i in Poly.exponents()] for Poly in Polys]
 
-
+	#DoGfan(Polys,R)
 	global HullInfoMap
 	HullInfoMap = {}
 	HullTime = time()
@@ -37,11 +60,11 @@ def DoTests(nvars):
 	print ""
 	HullTime = time() - HullTime
 	print "ConvexHullTime", HullTime
-	#DoGfan(Polys,R)
+
 	TempStr = DoNewAlgorithm(PolysAsPts, HullInfoMap)
 	#DoMinkowskiSum(Polys, PtsList)
 	#DoCayleyPolytope(PtsList)
-	#DoNaiveAlgorithm(HullInfoMap, nvars - 1)
+	DoNaiveAlgorithm(HullInfoMap, nvars - 1)
 	return str(nvars) + ',' + str(EdgeProd) +',' + TempStr
 
 #-------------------------------------------------------------------------------
@@ -249,15 +272,18 @@ def DoNaiveAlgorithm(HullInfoMap, NumberOfPolytopes):
 					IntersectCones(Index+1, TempCone, NumberOfPolytopes)
 		return
 
+
+	global ConeSet
+	ConeSet = set()
 	StartTime = time()
 	AFaces = HullInfoMap[(0,"Faces")]
 	for i in xrange(len(AFaces[0])):
 		IntersectCones(0, Cone(AFaces[0][i].InnerNormals), NumberOfPolytopes)
 	
 	print "Naive algorithm took", time() - StartTime, "seconds."
-	print "Naive algorithm found", len(Rays), "rays."
+	print "Naive algorithm found", len(ConeSet), "rays."
 	return
-
+"""
 MyFile = open('testing3','w')
 for i in xrange(100):
 	MyFile.write(DoTests(3))
@@ -275,3 +301,17 @@ for i in xrange(100):
 	MyFile.write(DoTests(5))
 	MyFile.write('\n')
 MyFile.close()
+"""
+
+def DoEdgeTest(nvars):
+	MyFile = open('fasttest' + str(nvars) + 'v2','w')
+	MyFile.write('[')
+	for i in xrange(10,20):
+		for j in xrange(5):
+			print i,j
+			MyFile.write(NumberEdgesCorrespondsToPretropisms(nvars,i))
+			MyFile.write(',')
+			MyFile.write('\n')
+	MyFile.write(']')
+	MyFile.close()
+	return

@@ -1,6 +1,9 @@
 load("GiftWrap.sage")
 
 def NormVector(V):
+	"""
+	Finds the norm of a vector
+	"""
 	Denom = 0
 	for i in xrange(len(V)):
 		Denom += V[i]^2
@@ -9,6 +12,9 @@ def NormVector(V):
 
 #-------------------------------------------------------------------------------
 def InnerProduct(V1,V2):
+	"""
+	Finds the inner product of two vectors
+	"""
 	InnerProd = 0
 	for i in xrange(len(V1)):
 		InnerProd += V1[i]*V2[i]
@@ -16,6 +22,9 @@ def InnerProduct(V1,V2):
 
 #-------------------------------------------------------------------------------
 def FindInitialForm(Pts, V):
+	"""
+	Computes the initial form of a vector and a set of points.
+	"""
 	InForm = []
 	MinimalIP = 'Test'
 	for Pt in Pts:
@@ -32,6 +41,9 @@ def FindInitialForm(Pts, V):
 
 #-------------------------------------------------------------------------------
 def ComputeFacetPretropisms(AFaces, BFaces):
+	"""
+	Testing function
+	"""
 	#Currently is an inefficient implementation
 	AFacetVectors = [(NormVector(AFaces[1][i].InnerNormals[0]),i) for i in xrange(len(AFaces[1]))]
 	BFacetVectors = [NormVector(BFaces[1][i].InnerNormals[0]) for i in xrange(len(BFaces[1]))]
@@ -47,6 +59,10 @@ def ComputeFacetPretropisms(AFaces, BFaces):
 
 #-------------------------------------------------------------------------------
 def FasterWrap(PolyAsPts):
+	"""
+	Wraps Sage's convex hull output to find only the edge skeleton where each 
+	edge knows its neighbors and knows its cone.
+	"""
 	Faces = [[],[]]
 	SagePolyhedron = Polyhedron(PolyAsPts)
 	IndexToPointMap = {}
@@ -93,13 +109,16 @@ def FasterWrap(PolyAsPts):
 			if len(Neighbor1.Vertices.intersection(PossibleParent.Vertices)) == 2:
 				Neighbor1.InnerNormals += PossibleParent.InnerNormals
 
-	Startt = time()
 	for i in xrange(len(Faces[0])):
 		Faces[0][i].MyCone = Cone(Faces[0][i].InnerNormals)
 	return Faces, IndexToPointMap, PointToIndexMap, NecessaryVertices
 
 #-------------------------------------------------------------------------------
 def WrapHull(PolyAsPts):
+	"""
+	Wraps Sage's convex hull output to mimic the whole output of the gift
+	wrapping algorithm.
+	"""
 	Faces = []
 	SagePolyhedron = Polyhedron(PolyAsPts)
 	IndexToPointMap = {}

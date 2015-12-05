@@ -44,7 +44,6 @@ def GetHNF(Pts):
 
 #-------------------------------------------------------------------------------
 def GetNormalFromHNF(HNF):
-	# It feels wrong taking the first generator of the kernel
 	return list(Matrix(HNF).transpose().kernel().gens()[0])
 
 #-------------------------------------------------------------------------------
@@ -100,9 +99,9 @@ def FindNewFacePts(Pts, EdgePts, Normal, KnownFacePts, NormalThroughFace):
 		if Pt not in KnownFacePts:
 			Vector = MakeVector(EdgePts[0], Pt)
 			Denom = DotProduct(Vector, Normal)
-			if n(Denom,1000) == 0:
+			if n(Denom,100000) == 0:
 				print "Internal error in FindNewFacePts, denominator = 0."
-				raw_input()
+				continue
 			Num = DotProduct(Vector, NormalThroughFace)
 			Angle = - Num/Denom
 			if MaxAngle == 'Test':
@@ -244,10 +243,10 @@ def FindInitialFacet(Pts):
 				FirstPts = [Pt]
 				FirstPtValue = Pt[0]
 		return FirstPts
-
 	FirstPts = FindFirstPts(Pts)
 	Normal = [-1 if i == 0 else 0 for i in xrange(len(Pts[0]))]
 	Axes = [[1 if j == i else 0 for j in xrange(len(Pts[0]))] for i in xrange(2,len(Pts[0]))]
+
 	while True:
 		if len(FirstPts) == 1:
 			Dim = 0
@@ -279,7 +278,7 @@ def MakeIndexMaps(Pts):
 	return PointToIndexMap, IndexToPointMap
 
 #-------------------------------------------------------------------------------
-def PrintFaces():
+def PrintFaces(Faces):
 	print "BEGIN"
 	for i in xrange(len(Faces)):
 		print ""

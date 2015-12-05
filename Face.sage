@@ -6,6 +6,7 @@ class Face:
 		self.Neighbors = set()
 		self.Children = set()
 		self.Parents = set()
+		self.MyCone = 0
 	def PrintProps(self):
 		print ""
 		print "Below is a face of dimension " , self.Dimension
@@ -14,5 +15,6 @@ class Face:
 		print "Neighbors = ", self.Neighbors
 		print "Children = ", self.Children
 		print "Parents = ", self.Parents
+		print "Cone = ", self.MyCone
 		print ""
 		return

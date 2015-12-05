@@ -2,6 +2,11 @@ load("RandomPretropisms.sage")
 
 #-------------------------------------------------------------------------------
 def DoTest(nvars, UseGiftWrap = False):
+	"""
+	Function that allows speed comparisons of many different methods to compute
+	pretropisms.
+	"""
+	
 	PolyString = ""
 	for i in xrange(nvars - 1):
 		PolyString += "x_" + str(i) + ','
@@ -10,7 +15,7 @@ def DoTest(nvars, UseGiftWrap = False):
 	HighestExp = 30
 	NumberOfTerms = nvars + 1
 
-	# I want a fast way to guarantee that I have full dimensional polytopes with the only nvars + 1 points.
+	#I want a fast way to guarantee that I have full dimensional simplicial polytopes
 	Polys = []
 	GfanPolys = []
 	while len(Polys) < nvars - 1:
@@ -24,11 +29,12 @@ def DoTest(nvars, UseGiftWrap = False):
 
 	PolysAsPts = [[[Integer(j) for j in i] for i in Poly.exponents()] for Poly in Polys]
 
+	#Instead of having a lot of lists sitting around, I have the face structures,
+	#maps, and a list of the pts all stored in a map. Each polytope has its values
+	#stored here
 	global HullInfoMap
 	HullInfoMap = {}
 	HullTime = time()
-	PtsList = []
-
 	for i in xrange(len(PolysAsPts)):
 		if UseGiftWrap:
 			Faces, IndexToPointMap, PointToIndexMap, Pts = GiftWrap(PolysAsPts[i],True)
@@ -44,19 +50,25 @@ def DoTest(nvars, UseGiftWrap = False):
 	print "ConvexHullTime", HullTime
 	TimeList = [HullTime]
 	TimeList.append(DoNewAlgorithm(PolysAsPts, HullInfoMap,nvars - 1))
-	TimeList.append(DoMinkowskiSum(Polys, PtsList))
-	TimeList.append(DoCayleyPolytope(PtsList))
-	TimeList.append(DoGfan(PolyString, GfanPolys))
+	#TimeList.append(DoMinkowskiSum(Polys, PtsList))
+	#TimeList.append(DoCayleyPolytope(PtsList))
+	#TimeList.append(DoGfan(PolyString, GfanPolys))
 	TimeList.append(DoGfanFromSage(Polys, R))
-	TimeList.append(DoConeIntersectionAlgorithm(HullInfoMap, nvars - 1))
+	#TimeList.append(DoConeIntersectionAlgorithm(HullInfoMap, nvars - 1))
 
 	print TimeList
 	return TimeList
 
 #-------------------------------------------------------------------------------
 def DoLotsOfTests(nvars, ntests):
+	"""
+	This is a wrapper so that DoTest can easily be called many times.
+	"""
+	if ntests < 1 or nvars < 3:
+		print "Invalid input."
+		return
 	TempList = DoTest(nvars)
-	for i in xrange(ntests-1):
+	for i in xrange(1,ntests):
 		Trial = DoTest(nvars)
 		TempList = [TempList[j] + Trial[j] for j in xrange(len(Trial))]
 		print "WorkingSum of ", i + 2, "trials", TempList

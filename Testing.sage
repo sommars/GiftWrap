@@ -44,7 +44,6 @@ def DoTest(nvars, UseGiftWrap = False):
 		HullInfoMap[(i,"IndexToPointMap")] = IndexToPointMap
 		HullInfoMap[(i,"PointToIndexMap")] = PointToIndexMap
 		HullInfoMap[(i,"Pts")] = Pts
-		PtsList.append(Pts)
 
 	HullTime = time() - HullTime
 	print "ConvexHullTime", HullTime
@@ -53,7 +52,7 @@ def DoTest(nvars, UseGiftWrap = False):
 	#TimeList.append(DoMinkowskiSum(Polys, PtsList))
 	#TimeList.append(DoCayleyPolytope(PtsList))
 	#TimeList.append(DoGfan(PolyString, GfanPolys))
-	TimeList.append(DoGfanFromSage(Polys, R))
+	#TimeList.append(DoGfanFromSage(Polys, R))
 	#TimeList.append(DoConeIntersectionAlgorithm(HullInfoMap, nvars - 1))
 
 	print TimeList
@@ -71,6 +70,6 @@ def DoLotsOfTests(nvars, ntests):
 	for i in xrange(1,ntests):
 		Trial = DoTest(nvars)
 		TempList = [TempList[j] + Trial[j] for j in xrange(len(Trial))]
-		print "WorkingSum of ", i + 2, "trials", TempList
+		print "WorkingSum of ", i + 1, "trials", TempList
 	print "final result = ", [TempList[i]/ntests for i in xrange(len(TempList))]
 	return [TempList[i]/ntests for i in xrange(len(TempList))]

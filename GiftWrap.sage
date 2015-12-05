@@ -2,6 +2,9 @@ from time import time
 load("GiftWrap_Util.sage")
 
 def GiftWrap(Pts,Silent=False):
+	"""
+	Initializes global variables and calls DoGiftWrap
+	"""
 	global Faces
 	Faces = "Start"
 	global PointToIndexMap
@@ -9,6 +12,10 @@ def GiftWrap(Pts,Silent=False):
 	return DoGiftWrap(Pts, Silent)
 
 def DoGiftWrap(Pts, Silent, InitialLongPointToShortPointMap = "Start", InitialShortPointToLongPointMap = "Start"):
+	"""
+	Performs the gift wrapping algorithm. Output formatted to be useful for 
+	pretropism computations.
+	"""
 	global Faces
 	global PointToIndexMap
 	global IndexToPointMap
@@ -112,7 +119,7 @@ def DoGiftWrap(Pts, Silent, InitialLongPointToShortPointMap = "Start", InitialSh
 		for i in xrange(len(Faces)):
 			FaceSum += (-1)^(i+1)*len(Faces[i])
 		if Silent != True:
-			PrintFaceLens()
+			PrintFaceLens(Faces)
 		if len(Vertices) + FaceSum != (-1)^(InitialDim+1) + 1:
 			print "Euler characteristic failed for polytope that lives in dimension", LocalDim
 			print "len(Vertices) = ", len(Vertices)
@@ -136,6 +143,10 @@ def DoGiftWrap(Pts, Silent, InitialLongPointToShortPointMap = "Start", InitialSh
 
 #-------------------------------------------------------------------------------
 def MakeFace(FacePts, Pts, LongPointToShortPointMap, ShortPointToLongPointMap, Barycenter, Dimension,Silent):
+	"""
+	Creates a face object for the given input face points and fills out as much
+	of the object as it can.
+	"""
 	#Check if this face has already been defined
 	PtIndexSet = set([PointToIndexMap[tuple(ShortPointToLongPointMap[tuple(FacePts[i])])] for i in xrange(len(FacePts))])
 	for i in xrange(len(Faces[Dimension-1])):
@@ -208,19 +219,10 @@ def MakeFace(FacePts, Pts, LongPointToShortPointMap, ShortPointToLongPointMap, B
 	return IndexOfFace, PtIndicesToRemove
 
 
-def MakeRandomPointSet(Dim,Num):
-	Pts = []
-	for i in xrange(Num):
-		Pts.append([])
-		for j in xrange(Dim):
-			Pts[i].append(Integer(randint(-100,100)))
-	return Pts
-
 Tests = []
 for i in xrange(1):
-	Tests.append(MakeRandomPointSet(5,6))
+	Tests.append(MakeRandomPointList(5,6))
 
-#NOTE TO SELF: If I don't have a full dimensional polytope, the inner normals I have are incomplete.
 """
 Cyclic = CreateCyclicLists(8)
 Tests = []

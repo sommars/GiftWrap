@@ -126,6 +126,8 @@ def DoGiftWrap(Pts, Silent, InitialLongPointToShortPointMap = "Start", InitialSh
 						Child = Faces[Index-1][Child] 
 						Child.Parents.add(j)
 						Child.InnerNormals += Face.InnerNormals
+			for i in xrange(len(Faces[0])):
+				Faces[0][i].MyCone = Cone(Faces[0][i].InnerNormals)
 			NecessaryVertices = [IndexToPointMap[Vertex] for Vertex in Vertices]
 			if Silent != True:
 				print "Euler characteristic passed for polytope that lives in dimension", LocalDim
@@ -224,8 +226,6 @@ Cyclic = CreateCyclicLists(8)
 Tests = []
 for i in xrange(len(Cyclic)):
 	Tests.append(Cyclic[i])
-
-
 TotalTime = time()
 for Test in Tests:
 	print Test

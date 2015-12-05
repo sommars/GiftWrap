@@ -23,45 +23,33 @@ def DoTest(nvars, UseGiftWrap = False):
 			GfanPolys.append(NewGfpoly)
 
 	PolysAsPts = [[[Integer(j) for j in i] for i in Poly.exponents()] for Poly in Polys]
-	print "HI"
 
 	global HullInfoMap
 	HullInfoMap = {}
 	HullTime = time()
 	PtsList = []
-	EdgeProd = 1
 
 	for i in xrange(len(PolysAsPts)):
-		print i, PolysAsPts[i]
 		if UseGiftWrap:
 			Faces, IndexToPointMap, PointToIndexMap, Pts = GiftWrap(PolysAsPts[i],True)
 		else:
 			Faces, IndexToPointMap, PointToIndexMap, Pts = FasterWrap(PolysAsPts[i])
-
 		HullInfoMap[(i,"Faces")] = Faces
 		HullInfoMap[(i,"IndexToPointMap")] = IndexToPointMap
 		HullInfoMap[(i,"PointToIndexMap")] = PointToIndexMap
 		HullInfoMap[(i,"Pts")] = Pts
-		EdgeProd = EdgeProd*len(Faces[0])
 		PtsList.append(Pts)
 
-	print ""
 	HullTime = time() - HullTime
-
-	TimeList = []
-
-	#DoGfan(Polys,R)
-	TimeList.append(DoActualGfan(PolyString, GfanPolys))
-	TempStr = ''
-	#TimeList.append(Jeff(PolysAsPts, HullInfoMap,nvars - 1))
-	TimeList.append(DoNewNewAlgorithm(PolysAsPts, HullInfoMap,nvars - 1)+HullTime)
 	print "ConvexHullTime", HullTime
-	#TimeList.append(DoNewAlgorithm(PolysAsPts, HullInfoMap))
-	#TimeList.append(DoMinkowskiSum(Polys, PtsList))
-	#TimeList.append(DoCayleyPolytope(PtsList))
-	#TimeList.append(DoNaiveAlgorithm(HullInfoMap, nvars - 1))
-	for i in xrange(6):
-		print ""
+	TimeList = [HullTime]
+	TimeList.append(DoNewAlgorithm(PolysAsPts, HullInfoMap,nvars - 1))
+	TimeList.append(DoMinkowskiSum(Polys, PtsList))
+	TimeList.append(DoCayleyPolytope(PtsList))
+	TimeList.append(DoGfan(PolyString, GfanPolys))
+	TimeList.append(DoGfanFromSage(Polys, R))
+	TimeList.append(DoConeIntersectionAlgorithm(HullInfoMap, nvars - 1))
+
 	print TimeList
 	return TimeList
 

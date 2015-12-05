@@ -5,66 +5,59 @@ import os
 
 #-------------------------------------------------------------------------------
 def DoNewAlgorithm(PolysAsPts, HullInfoMap, NumberOfPolytopes):
-
-	def Explore(PolytopeIndex, NewCone):
-		BFaces = HullInfoMap[(PolytopeIndex,"Faces")]
-		BIndexToPointMap =	HullInfoMap[(PolytopeIndex,"IndexToPointMap")]
-		BPointToIndexMap = HullInfoMap[(PolytopeIndex,"PointToIndexMap")]
-		B =	HullInfoMap[(PolytopeIndex,"Pts")]
+	"""
+	This is the implementation of our new algorithm to compute pretropisms.
+	"""
+	def TraverseEdgeSkeleton(PolytopeIndex, NewCone):
+		"""
+		Explores the edge skeleton and returns a list of cones that are the
+		intersection of NewCone with every edge in the pretropism graph.
+		"""
+		Faces = HullInfoMap[(PolytopeIndex,"Faces")]
+		PointToIndexMap = HullInfoMap[(PolytopeIndex,"PointToIndexMap")]
+		Pts =	HullInfoMap[(PolytopeIndex,"Pts")]
 
 		Normal = [0 for i in xrange(len(NewCone.rays()[0]))]
 		for Ray in NewCone.rays():
 			Normal = [Normal[i] + Ray[i] for i in xrange(len(Normal))]
-		BInitialForm = FindInitialForm(B, Normal)
+		InitialForm = FindInitialForm(Pts, Normal)
 
 		ConeList = []
 		EdgesToTest = set()
-		BInitialIndices = set([BPointToIndexMap[tuple(Pt)] for Pt in BInitialForm])
-		if len(BInitialIndices) == 1:
-			for i in xrange(len(BFaces[0])):
-				BFace = BFaces[0][i]
-				if BInitialIndices.issubset(BFace.Vertices):
-					EdgesToTest.add(i)			
-		elif len(BInitialIndices) == 2:
-			for i in xrange(len(BFaces[0])):
-				BFace = BFaces[0][i]
-				if BInitialIndices == BFace.Vertices:
-					EdgesToTest.add(i)
-					break
-		else:
-			for i in xrange(len(BFaces[0])):
-				BFace = BFaces[0][i]
-				if len(BInitialIndices.intersection(BFace.Vertices)) == 2:
-					EdgesToTest.add(i)
+		InitialIndices = set([PointToIndexMap[tuple(Pt)] for Pt in InitialForm])
+		for i in xrange(len(Faces[0])):
+			if len(InitialIndices.intersection(Faces[0][i].Vertices)) != 0:
+				EdgesToTest.add(i)
 
 		global ConeIntersectionCount
-		PretropEdges = set()
-		NotPretropEdges = set()
+		PretropGraphEdges = set()
+		NotPretropGraphEdges = set()
 		while(len(EdgesToTest) > 0):
 			TestEdge = EdgesToTest.pop()
-			BEdge = BFaces[0][TestEdge]
-			TempCone = (BEdge.MyCone).intersection(NewCone)
+			Edge = Faces[0][TestEdge]
+			TempCone = (Edge.MyCone).intersection(NewCone)
 			ConeIntersectionCount += 1
 			if len(TempCone.rays()) > 0:
-				PretropEdges.add(TestEdge)
+				PretropGraphEdges.add(TestEdge)
 				ConeList.append(TempCone)
-				for Neighbor in BEdge.Neighbors:
-					if Neighbor[0] not in PretropEdges and Neighbor[0] not in NotPretropEdges:
+				for Neighbor in Edge.Neighbors:
+					if Neighbor[0] not in PretropGraphEdges and Neighbor[0] not in NotPretropGraphEdges:
 						EdgesToTest.add(Neighbor[0])
 			else:
-				NotPretropEdges.add(TestEdge)
+				NotPretropGraphEdges.add(TestEdge)
 		return ConeList
 
 	def IntersectCones(Index, NewCone, NumberOfPolytopes):
+		"""
+		Performs the recursion
+		"""
 		global ConeSet
-		global HullInfoMap
 		if Index == NumberOfPolytopes:
 			if len(NewCone.rays()) == 1:
 				for Ray in NewCone.rays():
 					ConeSet.add(tuple(Ray.list()))
 		else:
-			CONESS = Explore(Index,NewCone)
-			for TempCone in CONESS:
+			for TempCone in TraverseEdgeSkeleton(Index,NewCone):
 				IntersectCones(Index + 1, TempCone, NumberOfPolytopes)
 		return
 
@@ -73,29 +66,30 @@ def DoNewAlgorithm(PolysAsPts, HullInfoMap, NumberOfPolytopes):
 	global ConeIntersectionCount
 	ConeIntersectionCount = 0
 	ConeSet = set()
-	AFaces = HullInfoMap[(0,"Faces")]
-	AIndexToPointMap =	HullInfoMap[(0,"IndexToPointMap")]
-	APointToIndexMap = HullInfoMap[(0,"PointToIndexMap")]
-	A =	HullInfoMap[(0,"Pts")]
 
-
-	ConeSet = set()
-	for AEdge in AFaces[0]:
-		IntersectCones(1,Cone(AEdge.InnerNormals), NumberOfPolytopes)
+	for Edge in HullInfoMap[(0,"Faces")][0]:
+		IntersectCones(1,Edge.MyCone, NumberOfPolytopes)
 
 	ConeList = list(ConeSet)
 	ConeList.sort()
+	#print "Number of cone intersections = ", ConeIntersectionCount
 	return time() - NewAlgStart
 
 #-------------------------------------------------------------------------------
-def DoMinkowskiSum(Polys, PtsList):
+def DoMinkowskiSum(Polys, PtsList, UseGiftWrap = True):
+	"""
+	Implements the Minkowski sum method to compute pretropisms.
+	"""
 	MinkowskiStart = time()
 	ProdPoly = 1
 	for Poly in Polys:
 		ProdPoly = ProdPoly*Poly
 	ProdPolysAsPts = [[Integer(j) for j in i] for i in ProdPoly.exponents()]
 
-	Faces, IndexToPointMap, PointToIndexMap, Pts = GiftWrap(ProdPolysAsPts,True)
+	if UseGiftWrap:
+		Faces, IndexToPointMap, PointToIndexMap, Pts = GiftWrap(ProdPolysAsPts,True)
+	else:
+		Faces, IndexToPointMap, PointToIndexMap, Pts = WrapHull(ProdPolysAsPts)
 	Normals = []
 	for Face in Faces[len(Faces)- 1]:
 		Normals.append(Face.InnerNormals[0])
@@ -111,7 +105,11 @@ def DoMinkowskiSum(Polys, PtsList):
 	return time() - MinkowskiStart
 
 #-------------------------------------------------------------------------------
-def DoCayleyPolytope(PtsList):
+def DoCayleyPolytope(PtsList, UseGiftWrap = True):
+	"""
+	Implements the Cayley embedding method to compute pretropisms
+	"""
+
 	CayleyStart = time()
 	CayleyPts = []
 
@@ -126,7 +124,10 @@ def DoCayleyPolytope(PtsList):
 		for j in xrange(len(CayleyPts[j])):
 			CayleyPts[i][j] = Integer(CayleyPts[i][j])
 
-	Faces, IndexToPointMap, PointToIndexMap, Pts = GiftWrap(CayleyPts,True)
+	if UseGiftWrap:
+		Faces, IndexToPointMap, PointToIndexMap, Pts = GiftWrap(CayleyPts,True)
+	else:
+		Faces, IndexToPointMap, PointToIndexMap, Pts = WrapHull(CayleyPts)
 
 	Dim = len(PtsList[0][0])
 	PtsMap = {}
@@ -150,6 +151,12 @@ def DoCayleyPolytope(PtsList):
 
 #-------------------------------------------------------------------------------
 def DoGfan(PolyString, GfanPolys):
+	"""
+	Calls the current version of Gfan and computes the tropical intersection. This
+	doesn't have the nice wrapping of DoGfanFromSage, but it won't have any wasted
+	time making objects. This is only useful for doing direct speed comparisons
+	between our code and Gfan.
+	"""
 	global GfanFileInputPath
 	global GfanPath
 	f = open(GfanFileInputPath,'w')
@@ -166,6 +173,10 @@ def DoGfan(PolyString, GfanPolys):
 
 #-------------------------------------------------------------------------------
 def DoGfanFromSage(Polys, R):
+	"""
+	Calls gfan 0.3 via the Sage interface. Sets up the global variable
+	Rays which contains the sorted list of pretropisms.
+	"""
 	StartTime = time()
 	global Rays
 	try:
@@ -173,19 +184,24 @@ def DoGfanFromSage(Polys, R):
 	except:
 		print "Gfan aborted!"
 		Rays = []
+	GfanTime = time() - StartTime
 	for i in xrange(len(Rays)):
 		Rays[i] = [-Rays[i][j] for j in xrange(len(Rays[i]))]
 	Rays.sort()
-	return time() - StartTime
+	return GfanTime
 
 #-------------------------------------------------------------------------------
 def DoConeIntersectionAlgorithm(HullInfoMap, NumberOfPolytopes):
+	"""
+	Function that performs the cone intersection method with pruning along
+	the way.
+	"""
 	def IntersectCones(Index, NewCone, NumberOfPolytopes):
 		global ConeSet
 		global HullInfoMap
 		Faces = HullInfoMap[(Index + 1,"Faces")]
 		for i in xrange(len(Faces[0])):
-			TempCone = NewCone.intersection(Cone(Faces[0][i].InnerNormals))
+			TempCone = NewCone.intersection(Faces[0][i].MyCone)
 			if TempCone.dim() > 0:
 				if Index == NumberOfPolytopes - 2:
 					if len(TempCone.rays()) == 1:
@@ -198,8 +214,7 @@ def DoConeIntersectionAlgorithm(HullInfoMap, NumberOfPolytopes):
 	StartTime = time()
 	global ConeSet
 	ConeSet = set()
-	AFaces = HullInfoMap[(0,"Faces")]
-	for i in xrange(len(AFaces[0])):
-		IntersectCones(0, Cone(AFaces[0][i].InnerNormals), NumberOfPolytopes)
+	for Edge in HullInfoMap[(0,"Faces")][0]:
+		IntersectCones(0, Edge.MyCone, NumberOfPolytopes)
 
 	return time() - StartTime

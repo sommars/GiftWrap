@@ -1,6 +1,10 @@
 load("Face.sage")
 
 def PtsAreValid(Pts):
+	"""
+	Checks to make sure the input points are valid for this implementation of the
+	gift wrapping algorithm.
+	"""
 	Dim = len(Pts[0])
 	for Pt in Pts:
 		if len(Pt) != Dim:
@@ -12,6 +16,9 @@ def PtsAreValid(Pts):
 
 #-------------------------------------------------------------------------------
 def RemoveDups(Pts):
+	"""
+	Removes duplicate points
+	"""
 	UniquePts = []
 	for Pt in Pts:
 		if Pt not in UniquePts:
@@ -20,6 +27,9 @@ def RemoveDups(Pts):
 
 #-------------------------------------------------------------------------------
 def CheckNormalFormDim(HNF):
+	"""
+	Checks what dimension the Hermite Normal Form is in
+	"""
 	Dim = 0
 	for i in xrange(len(HNF[0])):
 		if HNF[Dim][i] != 0:
@@ -30,6 +40,9 @@ def CheckNormalFormDim(HNF):
 
 #-------------------------------------------------------------------------------
 def GetHNF(Pts):
+	"""
+	Compute the Hermite Normal Form of a matrix
+	"""
 	# Instead of thinking about these as points, we should think about these as
 	# being vectors.
 	if len(Pts) < 2:
@@ -44,10 +57,17 @@ def GetHNF(Pts):
 
 #-------------------------------------------------------------------------------
 def GetNormalFromHNF(HNF):
+	"""
+	Compute the normal given a Hermite Normal Form
+	"""
 	return list(Matrix(HNF).transpose().kernel().gens()[0])
 
 #-------------------------------------------------------------------------------
 def ConvertMatrixToList(Matrix):
+	"""
+	Converts a matrix into a list of lists. Explicitly casts the types
+	to avoid type conversion errors.
+	"""
 	Pts = []
 	for Row in Matrix:
 		Pts.append(list(Row))
@@ -58,6 +78,9 @@ def ConvertMatrixToList(Matrix):
 
 #-------------------------------------------------------------------------------
 def FindBarycenter(Pts):
+	"""
+	Finds the barycenter of a list of points
+	"""
 	Barycenter = [0 for i in xrange(len(Pts[0]))]
 	for i in xrange(len(Pts)):
 		for j in xrange(len(Pts[i])):
@@ -68,11 +91,18 @@ def FindBarycenter(Pts):
 
 #-------------------------------------------------------------------------------
 def MakeVector(Pt1, Pt2):
-	# The first point is where the vector originates and the second is where it points
+	"""
+	Creates a vector from the two input points. Vector originates at first point
+	and points toward the latter
+	"""
 	return [Pt2[i] - Pt1[i] for i in xrange(len(Pt1))]
 
 #-------------------------------------------------------------------------------
 def MakeNormalPointInDirectionOfPt(Normal, Barycenter, Pt):
+	"""
+	Makes normal point in direction of input point. Used to make normals 
+	inner normals.
+	"""
 	def DistanceBetweenPts(Pt1, Pt2):
 		D = 0
 		for i in xrange(len(Pt1)):
@@ -87,6 +117,9 @@ def MakeNormalPointInDirectionOfPt(Normal, Barycenter, Pt):
 
 #-------------------------------------------------------------------------------
 def FindNewFacePts(Pts, EdgePts, Normal, KnownFacePts, NormalThroughFace):
+	"""
+	Finds points resting on a face with respect to a given direction.
+	"""
 	def DotProduct(U,V):
 		DotProduct = 0
 		for i in range(len(U)):
@@ -120,6 +153,9 @@ def FindNewFacePts(Pts, EdgePts, Normal, KnownFacePts, NormalThroughFace):
 
 #-------------------------------------------------------------------------------
 def FindNewFacePtsFromEdge(Pts, EdgePts, Normal, KnownFacePts):
+	"""
+	From an edge, this function finds new face pts
+	"""
 	if len(EdgePts) < 2:
 		print "Insufficient points to compute the required Hermite Normal Form"
 		raw_input()
@@ -136,6 +172,11 @@ def FindNewFacePtsFromEdge(Pts, EdgePts, Normal, KnownFacePts):
 
 #-------------------------------------------------------------------------------
 def MakeMaps(Pts, ShortPointToLongPointMap = "Start", LongPointToShortPointMap = "Start"):
+	"""
+	Say you're given an n dimensional set of points that rest in d dimensions
+	where d > n. We may have to rotate the set of points multiple times
+	using MakePointMap, and this function wraps it.
+	"""
 	def ComposeMaps(Map1, Map2):
 		return {tuple(k): Map2.get(tuple(v)) for k, v in Map1.items()}
 
@@ -166,6 +207,11 @@ def MakeMaps(Pts, ShortPointToLongPointMap = "Start", LongPointToShortPointMap =
 
 #-------------------------------------------------------------------------------
 def MakePointMap(Pts):
+	"""
+	Maps points from a high dimension down to a lower one. This is what I use
+	to simulate rotating the points. After we rotate points, we need to know
+	what point rotated where. Instead of recomputing, I'm storing maps.
+	"""
 	def GetUCT(Pts):
 		return (((matrix(matrix(Pts),ZZ).transpose()).echelon_form(include_zero_rows = True, transformation = True)[1])^-1).transpose()
 
@@ -216,6 +262,9 @@ def MakePointMap(Pts):
 
 #-------------------------------------------------------------------------------
 def FindInitialFacet(Pts):
+	"""
+	Finds an n-1 dimensional facet for an n dimensional set of points
+	"""
 	def GetUnitNormalThroughFacet(Vectors):
 		Vector = list(Matrix(Vectors).echelon_form().transpose().kernel().gens()[0])
 		UnitVector = []
@@ -269,6 +318,9 @@ def FindInitialFacet(Pts):
 
 #-------------------------------------------------------------------------------
 def MakeIndexMaps(Pts):
+	"""
+	Make maps that map points to indices and indices to points
+	"""
 	PointToIndexMap = {}
 	IndexToPointMap = {}
 	for i in xrange(len(Pts)):
@@ -279,6 +331,9 @@ def MakeIndexMaps(Pts):
 
 #-------------------------------------------------------------------------------
 def PrintFaces(Faces):
+	"""
+	Printing function for debugging
+	"""
 	print "BEGIN"
 	for i in xrange(len(Faces)):
 		print ""
@@ -292,13 +347,19 @@ def PrintFaces(Faces):
 	return
 
 #-------------------------------------------------------------------------------
-def PrintFaceLens():
+def PrintFaceLens(Faces):
+	"""
+	Printing function for debugging
+	"""
 	for i in xrange(len(Faces)):
 		print "LenFaces[",i,"] = ", len(Faces[i])
 	return
 
 #-------------------------------------------------------------------------------
 def ConvexHull2d(Pts):
+	"""
+	Implements the 2d gift wrapping algorithm
+	"""
 	def FindNextPt(Pts, Pt1):
 		def DoTurn(Pt1, Pt2, Pt3):
 		 	return cmp((Pt2[0] - Pt1[0])*(Pt3[1] - Pt1[1]) - (Pt3[0] - Pt1[0])*(Pt2[1] - Pt1[1]), 0)
@@ -323,6 +384,9 @@ def ConvexHull2d(Pts):
 
 #-------------------------------------------------------------------------------
 def CreateCyclicLists(n):
+	"""
+	Creates lists of support for the cyclic-n roots
+	"""
 	system = []
 	for i in xrange(n-1):
 		equation = []
@@ -338,7 +402,22 @@ def CreateCyclicLists(n):
 	return system
 
 #-------------------------------------------------------------------------------
+def MakeRandomPointList(Dim,Num):
+	"""
+	Makes a random list of points to use for testing
+	"""
+	Pts = []
+	for i in xrange(Num):
+		Pts.append([])
+		for j in xrange(Dim):
+			Pts[i].append(Integer(randint(-100,100)))
+	return Pts
+
+#-------------------------------------------------------------------------------
 def RemovePts(PtIndicesToRemove, Pts, ShortPointToLongPointMap, LongPointToShortPointMap, IndexToPointMap):
+	"""
+	Removes unnecessary points from the universe of points
+	"""
 	for PtIndex in PtIndicesToRemove:
 		Pt = IndexToPointMap[PtIndex]
 		ShortPt = LongPointToShortPointMap.pop(tuple(Pt))

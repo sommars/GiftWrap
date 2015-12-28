@@ -1,78 +1,98 @@
 load("Pretropism_Util.sage")
 load("PretropismConfig.sage")
 from time import time
+from multiprocessing import Pool
 import os
 
 #-------------------------------------------------------------------------------
-def DoNewAlgorithm(PolysAsPts, HullInfoMap, NumberOfPolytopes):
+def TraverseEdgeSkeleton(PolytopeIndex, NewCone, ConeIntersectionCount):
+	"""
+	Explores the edge skeleton and returns a list of cones that are the
+	intersection of NewCone with every edge in the pretropism graph.
+	"""
+	Faces = HullInfoMap[(PolytopeIndex,"Faces")]
+	PointToIndexMap = HullInfoMap[(PolytopeIndex,"PointToIndexMap")]
+	Pts = HullInfoMap[(PolytopeIndex,"Pts")]
+
+	Normal = [0 for i in xrange(len(NewCone.rays()[0]))]
+	for Ray in NewCone.rays():
+		Normal = [Normal[i] + Ray[i] for i in xrange(len(Normal))]
+	InitialForm = FindInitialForm(Pts, Normal)
+
+	ConeList = []
+	EdgesToTest = set()
+	InitialIndices = set([PointToIndexMap[tuple(Pt)] for Pt in InitialForm])
+	for i in xrange(len(Faces[0])):
+		if len(InitialIndices.intersection(Faces[0][i].Vertices)) != 0:
+			EdgesToTest.add(i)
+
+	PretropGraphEdges = set()
+	NotPretropGraphEdges = set()
+	while(len(EdgesToTest) > 0):
+		TestEdge = EdgesToTest.pop()
+		Edge = Faces[0][TestEdge]
+		TempCone = (Edge.MyCone).intersection(NewCone)
+		ConeIntersectionCount += 1
+		if len(TempCone.rays()) > 0:
+			PretropGraphEdges.add(TestEdge)
+			ConeList.append(TempCone)
+			for Neighbor in Edge.Neighbors:
+				if Neighbor[0] not in PretropGraphEdges and Neighbor[0] not in NotPretropGraphEdges:
+					EdgesToTest.add(Neighbor[0])
+		else:
+			NotPretropGraphEdges.add(TestEdge)
+	return ConeList
+
+#-------------------------------------------------------------------------------
+def IntersectCones(Index, NewCone, NumberOfPolytopes, ConeSet, ConeIntersectionCount):
+	"""
+	Performs the recursion
+	"""
+	if Index == NumberOfPolytopes:
+		if len(NewCone.rays()) == 1:
+			for Ray in NewCone.rays():
+				ConeSet.add(tuple(Ray.list()))
+	else:
+		for TempCone in TraverseEdgeSkeleton(Index, NewCone, ConeIntersectionCount):
+			IntersectCones(Index + 1, TempCone, NumberOfPolytopes, ConeSet, ConeIntersectionCount)
+	return
+
+#-------------------------------------------------------------------------------
+def IntersectConesWrapper(EdgeIndex):
+
+	global StartEdges
+	global NumberOfPolytopes
+	ConeSet = set()
+	ConeIntersectionCount = 0
+	IntersectCones(1, StartEdges[EdgeIndex].MyCone, NumberOfPolytopes, ConeSet, ConeIntersectionCount)
+	return ConeSet, ConeIntersectionCount
+#-------------------------------------------------------------------------------
+def DoNewAlgorithm(HullInfoMaps):
 	"""
 	This is the implementation of our new algorithm to compute pretropisms.
 	"""
-	def TraverseEdgeSkeleton(PolytopeIndex, NewCone):
-		"""
-		Explores the edge skeleton and returns a list of cones that are the
-		intersection of NewCone with every edge in the pretropism graph.
-		"""
-		Faces = HullInfoMap[(PolytopeIndex,"Faces")]
-		PointToIndexMap = HullInfoMap[(PolytopeIndex,"PointToIndexMap")]
-		Pts =	HullInfoMap[(PolytopeIndex,"Pts")]
-
-		Normal = [0 for i in xrange(len(NewCone.rays()[0]))]
-		for Ray in NewCone.rays():
-			Normal = [Normal[i] + Ray[i] for i in xrange(len(Normal))]
-		InitialForm = FindInitialForm(Pts, Normal)
-
-		ConeList = []
-		EdgesToTest = set()
-		InitialIndices = set([PointToIndexMap[tuple(Pt)] for Pt in InitialForm])
-		for i in xrange(len(Faces[0])):
-			if len(InitialIndices.intersection(Faces[0][i].Vertices)) != 0:
-				EdgesToTest.add(i)
-
-		global ConeIntersectionCount
-		PretropGraphEdges = set()
-		NotPretropGraphEdges = set()
-		while(len(EdgesToTest) > 0):
-			TestEdge = EdgesToTest.pop()
-			Edge = Faces[0][TestEdge]
-			TempCone = (Edge.MyCone).intersection(NewCone)
-			ConeIntersectionCount += 1
-			if len(TempCone.rays()) > 0:
-				PretropGraphEdges.add(TestEdge)
-				ConeList.append(TempCone)
-				for Neighbor in Edge.Neighbors:
-					if Neighbor[0] not in PretropGraphEdges and Neighbor[0] not in NotPretropGraphEdges:
-						EdgesToTest.add(Neighbor[0])
-			else:
-				NotPretropGraphEdges.add(TestEdge)
-		return ConeList
-
-	def IntersectCones(Index, NewCone, NumberOfPolytopes):
-		"""
-		Performs the recursion
-		"""
-		global ConeSet
-		if Index == NumberOfPolytopes:
-			if len(NewCone.rays()) == 1:
-				for Ray in NewCone.rays():
-					ConeSet.add(tuple(Ray.list()))
-		else:
-			for TempCone in TraverseEdgeSkeleton(Index,NewCone):
-				IntersectCones(Index + 1, TempCone, NumberOfPolytopes)
-		return
 
 	NewAlgStart = time()
-	global ConeSet
-	global ConeIntersectionCount
+	global StartEdges
+	StartEdges = HullInfoMap[(0,"Faces")][0]
+	MyPool = Pool(5)
+	MyIter = MyPool.imap(IntersectConesWrapper, [i for i in xrange(len(StartEdges))])
+	print ""
 	ConeIntersectionCount = 0
 	ConeSet = set()
-
-	for Edge in HullInfoMap[(0,"Faces")][0]:
-		IntersectCones(1,Edge.MyCone, NumberOfPolytopes)
-
+	ShouldContinue = True
+	while ShouldContinue == True:
+		try:
+			TempTuple = MyIter.next()
+			ConeSet = ConeSet.union(TempTuple[0])
+			ConeIntersectionCount += TempTuple[1]
+		except:
+			ShouldContinue = False
+	
 	ConeList = list(ConeSet)
 	ConeList.sort()
-	#print "Number of cone intersections = ", ConeIntersectionCount
+	print len(ConeList)
+	print "Number of cone intersections = ", ConeIntersectionCount
 	return time() - NewAlgStart
 
 #-------------------------------------------------------------------------------

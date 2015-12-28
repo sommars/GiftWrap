@@ -28,11 +28,13 @@ def DoTest(nvars, UseGiftWrap = False):
 			GfanPolys.append(NewGfpoly)
 
 	PolysAsPts = [[[Integer(j) for j in i] for i in Poly.exponents()] for Poly in Polys]
-
+	print PolysAsPts
 	#Instead of having a lot of lists sitting around, I have the face structures,
 	#maps, and a list of the pts all stored in a map. Each polytope has its values
 	#stored here
 	global HullInfoMap
+	global NumberOfPolytopes
+	NumberOfPolytopes = len(PolysAsPts)
 	HullInfoMap = {}
 	HullTime = time()
 	for i in xrange(len(PolysAsPts)):
@@ -48,7 +50,7 @@ def DoTest(nvars, UseGiftWrap = False):
 	HullTime = time() - HullTime
 	print "ConvexHullTime", HullTime
 	TimeList = [HullTime]
-	TimeList.append(DoNewAlgorithm(PolysAsPts, HullInfoMap,nvars - 1))
+	TimeList.append(DoNewAlgorithm(HullInfoMap))
 	#TimeList.append(DoMinkowskiSum(Polys, PtsList))
 	#TimeList.append(DoCayleyPolytope(PtsList))
 	#TimeList.append(DoGfan(PolyString, GfanPolys))

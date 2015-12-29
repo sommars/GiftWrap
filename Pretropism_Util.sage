@@ -179,3 +179,64 @@ def WrapHull(PolyAsPts):
 		Faces[0][i].MyCone = Cone(Faces[0][i].InnerNormals)
 
 	return Faces, IndexToPointMap, PointToIndexMap, NecessaryVertices
+
+#-------------------------------------------------------------------------------
+def ConeContains(P1, P2):
+	return all(P1.contains(Ray) for Ray in P2.rays())
+	
+#-------------------------------------------------------------------------------
+def ParseGf(Output):
+	#Output = ['1 0 1 0', '0 1 0 1']
+	ToReturn = []
+	for Ray in Output:
+		NewRay = []
+		Index = 0
+		for i in xrange(len(Ray)+1):
+			if i == len(Ray) or Ray[i] == ' ':
+				NewRay.append(int(Ray[Index:i]))
+				Index = i
+		ToReturn.append(NewRay)
+	return ToReturn
+
+#-------------------------------------------------------------------------------
+def WrapWithLineality(Pts, R, Polys):
+	Faces, IndexToPointMap, PointToIndexMap, NecessaryVertices = FasterWrap(Pts)	
+	global MyRays
+	global gf
+	try:
+		Pf = R.ideal(Polys).groebner_fan().polyhedralfan()
+		Lineality = ParseGf(Pf.fan_dict['LINEALITY_SPACE'])
+		MyRays = Pf.rays()
+	except:
+		print "Gfan aborted!"
+		MyRays = []
+	for i in xrange(len(MyRays)):
+		MyRays[i] = [-MyRays[i][j] for j in xrange(len(MyRays[i]))]
+	MyRays.sort()
+	print Lineality	
+	gf = R.ideal(Polys).groebner_fan()
+
+	for j in xrange(len(Faces[1])):
+		Faces[1][j].InnerNormals = Faces[1][j].InnerNormals[0]
+
+	for MyCone in MyRays:
+		InitialForm = FindInitialForm(Pts, MyCone)
+		Indices = set([PointToIndexMap[tuple(i)] for i in InitialForm])
+		for Face in Faces[len(Faces)-1]:
+			if Indices == Face.Vertices:
+				Face.InnerNormals = MyCone
+	
+	NegativeLineality = [[-i for i in j] for j in Lineality]
+	for i in xrange(len(Faces[0])):
+		Neighbor1 = Faces[0][i]
+		Neighbor1.InnerNormals = []
+		Neighbor1.InnerNormals = Lineality + NegativeLineality
+		for j in xrange(len(Faces[1])):
+			PossibleParent = Faces[1][j]
+			if Neighbor1.Vertices.issubset(PossibleParent.Vertices):
+				Neighbor1.InnerNormals += [PossibleParent.InnerNormals]
+
+	for i in xrange(len(Faces[0])):
+		Faces[0][i].MyCone = Cone(Faces[0][i].InnerNormals)
+
+	return Faces, IndexToPointMap, PointToIndexMap, NecessaryVertices

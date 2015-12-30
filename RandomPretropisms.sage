@@ -74,37 +74,36 @@ def IntersectConesWrapper(EdgeIndex):
 				ConeIntersectionCount += NewConeIntersectionCount
 				ConeContainsCount += NewConeContainsCount
 		return ConeIntersectionCount, ConeContainsCount
+	MyStart = time()
 	global StartEdges
-	return ConeSet, IntersectCones(1, StartEdges[EdgeIndex].MyCone)
+	return ConeSet, IntersectCones(1, StartEdges[EdgeIndex].MyCone), time() - MyStart
 
 #-------------------------------------------------------------------------------
-def DoNewAlgorithm(HullInfoMaps):
+def DoNewAlgorithm(HullInfoMaps, ThreadCount):
 	"""
 	This is the implementation of our new algorithm to compute pretropisms.
 	"""
 	NewAlgStart = time()
 	global StartEdges
 	StartEdges = HullInfoMap[(0,"Faces")][0]
-	MyPool = Pool(5)
-	MyIter = MyPool.imap(IntersectConesWrapper, [i for i in xrange(len(StartEdges))])
+	MyPool = Pool(ThreadCount)
+	ResultList = MyPool.map(IntersectConesWrapper, [i for i in xrange(len(StartEdges))])
+	ConeSet = set()
 	ConeIntersectionCount = 0
 	ConeContainsCount = 0
-	ConeSet = set()
-	ShouldContinue = True
-	while ShouldContinue == True:
-		try:
-			TempTuple = MyIter.next()
-			ConeSet = ConeSet.union(TempTuple[0])
-			ConeIntersectionCount += TempTuple[1][0]
-			ConeContainsCount += TempTuple[1][1]
-		except:
-			ShouldContinue = False
-	
+	TimeList = []
+	for Element in ResultList:
+		ConeSet = ConeSet.union(Element[0])
+		ConeIntersectionCount += Element[1][0]
+		ConeContainsCount += Element[1][1]
+		TimeList.append(Element[2])
 	ConeList = list(ConeSet)
 	ConeList.sort()
+	TimeList.sort()
 	print "NEW RESULT", ConeList
 	print "Number of cone intersections = ", ConeIntersectionCount
 	print "Number of cone contains = ", ConeContainsCount
+	print "List of times", TimeList
 	return time() - NewAlgStart
 
 #-------------------------------------------------------------------------------

@@ -5,8 +5,9 @@ from multiprocessing import Pool
 import os
 
 #-------------------------------------------------------------------------------
-def IntersectConesWrapper(EdgeIndex):
+def IntersectConesWrapper(ConeIndex):
 	global NumberOfPolytopes
+	global StartIndex
 	ConeIntersectionCount = 0
 	ConeContainsCount = 0
 	ConeSet = set()
@@ -60,7 +61,11 @@ def IntersectConesWrapper(EdgeIndex):
 		"""
 		Performs the recursion
 		"""
-		if Index == NumberOfPolytopes:
+		if (Index != NumberOfPolytopes) and (Index == StartIndex + 1):
+			if len(NewCone.rays()) > 0:
+				ConeSet.add(NewCone)
+			return 0, 0
+		elif Index == NumberOfPolytopes:
 			if len(NewCone.rays()) > 0:
 				for Ray in NewCone.rays():
 					ConeSet.add(tuple(Ray.list()))
@@ -75,35 +80,50 @@ def IntersectConesWrapper(EdgeIndex):
 				ConeContainsCount += NewConeContainsCount
 		return ConeIntersectionCount, ConeContainsCount
 	MyStart = time()
-	global StartEdges
-	return ConeSet, IntersectCones(1, StartEdges[EdgeIndex].MyCone), time() - MyStart
+	global ConesToFollowList
+	return ConeSet, IntersectCones(StartIndex, ConesToFollowList[ConeIndex]), time() - MyStart
 
 #-------------------------------------------------------------------------------
 def DoNewAlgorithm(HullInfoMaps, ThreadCount):
 	"""
 	This is the implementation of our new algorithm to compute pretropisms.
 	"""
-	NewAlgStart = time()
-	global StartEdges
-	StartEdges = HullInfoMap[(0,"Faces")][0]
-	MyPool = Pool(ThreadCount)
-	ResultList = MyPool.map(IntersectConesWrapper, [i for i in xrange(len(StartEdges))])
-	ConeSet = set()
+	
 	ConeIntersectionCount = 0
 	ConeContainsCount = 0
-	TimeList = []
-	for Element in ResultList:
-		ConeSet = ConeSet.union(Element[0])
-		ConeIntersectionCount += Element[1][0]
-		ConeContainsCount += Element[1][1]
-		TimeList.append(Element[2])
-	ConeList = list(ConeSet)
-	ConeList.sort()
+	NewAlgStart = time()
+	ConesToFollow = set()
+	global StartIndex
+	global NumberOfPolytopes
+	global ConesToFollowList
+	ConesToFollowList = [Edge.MyCone for Edge in HullInfoMap[(0,"Faces")][0]]
+	for i in xrange(1,NumberOfPolytopes):
+		print ""
+		print i, "out of", NumberOfPolytopes-1
+		StartIndex = i
+		MyPool = Pool(ThreadCount)
+		ResultList = MyPool.map(IntersectConesWrapper, [i for i in xrange(len(ConesToFollowList))])
+		#print ResultList
+		MyPool.terminate()
+		
+		ConesToFollowSet = set()
+		TimeList = []
+		for Element in ResultList:
+			ConesToFollowSet = ConesToFollowSet.union(Element[0])
+			ConeIntersectionCount += Element[1][0]
+			ConeContainsCount += Element[1][1]
+			TimeList.append(Element[2])
+		TimeList.sort()
+		#print "List of times", TimeList
+		ConesToFollowList = list(ConesToFollowSet)
+		print len(ConesToFollowList), len(ConesToFollowSet), ConeIntersectionCount, ConeContainsCount, TimeList[0:5], TimeList[len(TimeList)-6:len(TimeList)-1]
+
+	ConesToFollowList.sort()
 	TimeList.sort()
-	print "NEW RESULT", ConeList
+	#print "List of times", TimeList
+	print "NEW RESULT", ConesToFollowList
 	print "Number of cone intersections = ", ConeIntersectionCount
 	print "Number of cone contains = ", ConeContainsCount
-	print "List of times", TimeList
 	return time() - NewAlgStart
 
 #-------------------------------------------------------------------------------

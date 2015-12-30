@@ -1,7 +1,7 @@
 load("RandomPretropisms.sage")
 
 #-------------------------------------------------------------------------------
-def DoReducedCyclicTest(nvars, UseGiftWrap = False):
+def DoReducedCyclicTest(nvars, ThreadCount = 1, UseGiftWrap = False):
 	"""
 	Function that allows speed comparisons of many different methods to compute
 	pretropisms for the cyclic-n problem.
@@ -43,12 +43,13 @@ def DoReducedCyclicTest(nvars, UseGiftWrap = False):
 	print "ConvexHullTime", HullTime
 	TimeList = [HullTime]
 	TimeList.append(DoGfanFromSage(Polys, R))
-	TimeList.append(DoNewAlgorithm(HullInfoMap))
+	TimeList.append(DoNewAlgorithm(HullInfoMap, ThreadCount))
+	#TimeList.append(DoNewAlgorithmTwo(HullInfoMap,[i for i in xrange(len(PolysAsPts))]))
 	print TimeList
 	return TimeList
 
 #-------------------------------------------------------------------------------
-def DoGenericTest(nvars, UseGiftWrap = False):
+def DoGenericTest(nvars, ThreadCount = 1, UseGiftWrap = False):
 	"""
 	Function that allows speed comparisons of many different methods to compute
 	pretropisms.
@@ -97,7 +98,7 @@ def DoGenericTest(nvars, UseGiftWrap = False):
 	HullTime = time() - HullTime
 	print "ConvexHullTime", HullTime
 	TimeList = [HullTime]
-	TimeList.append(DoNewAlgorithm(HullInfoMap))
+	TimeList.append(DoNewAlgorithm(HullInfoMap, ThreadCount))
 	#TimeList.append(DoMinkowskiSum(Polys, PtsList))
 	#TimeList.append(DoCayleyPolytope(PtsList))
 	#TimeList.append(DoGfan(PolyString, GfanPolys))

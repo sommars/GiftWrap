@@ -44,7 +44,6 @@ def DoReducedCyclicTest(nvars, UseGiftWrap = False):
 	TimeList = [HullTime]
 	TimeList.append(DoGfanFromSage(Polys, R))
 	TimeList.append(DoNewAlgorithm(HullInfoMap))
-	#TimeList.append(DoNewAlgorithmTwo(HullInfoMap,[i for i in xrange(len(PolysAsPts))]))
 	print TimeList
 	return TimeList
 

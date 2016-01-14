@@ -1,13 +1,15 @@
 load("RandomPretropisms.sage")
 
 #-------------------------------------------------------------------------------
-def DoReducedCyclicTest(nvars, ThreadCount = 1, UseGiftWrap = False):
+def DoReducedCyclicTest(nvars, ThreadCount = 1):
 	"""
 	Function that allows speed comparisons of many different methods to compute
 	pretropisms for the cyclic-n problem.
 	"""
 	
 	Polys, R = ReducedCyclicNRoots(nvars)
+	#Polys, R = RandomlyLiftedReducedCyclicNRoots(nvars)
+	print Polys
 	#Manually reordering the polynomials by size of lineality space
 	if nvars == 5:
 		Polys = Polys
@@ -25,16 +27,16 @@ def DoReducedCyclicTest(nvars, ThreadCount = 1, UseGiftWrap = False):
 		Polys = Polys	
 	if nvars == 12:
 		Polys = [Polys[0],Polys[4],Polys[6],Polys[10],Polys[1],Polys[9],Polys[2],Polys[8],Polys[3],Polys[7],Polys[5]]
-	
-	PolysAsPts = [[[Integer(j) for j in i] for i in Poly.exponents()] for Poly in Polys]
 
+	PolysAsPts = [[[Integer(j) for j in i] for i in Poly.exponents()] for Poly in Polys]
+	print PolysAsPts
 	global HullInfoMap
 	HullInfoMap = {}
 	global NumberOfPolytopes
 	NumberOfPolytopes = len(PolysAsPts)
 	HullTime = time()
 	for i in xrange(len(PolysAsPts)):
-		Faces, IndexToPointMap, PointToIndexMap, Pts = WrapWithLineality(PolysAsPts[i], R, [Polys[i]])
+		Faces, IndexToPointMap, PointToIndexMap, Pts = FasterWrap(PolysAsPts[i])
 		HullInfoMap[(i,"Faces")] = Faces
 		HullInfoMap[(i,"IndexToPointMap")] = IndexToPointMap
 		HullInfoMap[(i,"PointToIndexMap")] = PointToIndexMap
@@ -49,7 +51,7 @@ def DoReducedCyclicTest(nvars, ThreadCount = 1, UseGiftWrap = False):
 	return TimeList
 
 #-------------------------------------------------------------------------------
-def DoGenericTest(nvars, ThreadCount = 1, UseGiftWrap = False):
+def DoGenericTest(nvars, ThreadCount = 1):
 	"""
 	Function that allows speed comparisons of many different methods to compute
 	pretropisms.
@@ -86,10 +88,7 @@ def DoGenericTest(nvars, ThreadCount = 1, UseGiftWrap = False):
 	HullInfoMap = {}
 	HullTime = time()
 	for i in xrange(len(PolysAsPts)):
-		if UseGiftWrap:
-			Faces, IndexToPointMap, PointToIndexMap, Pts = GiftWrap(PolysAsPts[i],True)
-		else:
-			Faces, IndexToPointMap, PointToIndexMap, Pts = FasterWrap(PolysAsPts[i])
+		Faces, IndexToPointMap, PointToIndexMap, Pts = FasterWrap(PolysAsPts[i])
 		HullInfoMap[(i,"Faces")] = Faces
 		HullInfoMap[(i,"IndexToPointMap")] = IndexToPointMap
 		HullInfoMap[(i,"PointToIndexMap")] = PointToIndexMap

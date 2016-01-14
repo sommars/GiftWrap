@@ -37,6 +37,7 @@ def FindInitialForm(Pts, V):
 			InForm = [Pt]
 		elif IP == MinimalIP:
 			InForm.append(Pt)
+	InForm.sort()
 	return InForm
 
 #-------------------------------------------------------------------------------
@@ -65,6 +66,10 @@ def FasterWrap(PolyAsPts):
 	"""
 	Faces = [[],[]]
 	SagePolyhedron = Polyhedron(PolyAsPts)
+	PositiveLineality = SagePolyhedron.equations_list()
+	PositiveLineality = [PositiveLineality[i][1:] for i in xrange(len(PositiveLineality))]
+	Lineality = PositiveLineality + [[-i for i in j] for j in PositiveLineality]
+	
 	IndexToPointMap = {}
 	PointToIndexMap = {}
 	NecessaryVertices = []
@@ -72,9 +77,7 @@ def FasterWrap(PolyAsPts):
 		Vertex = list(SagePolyhedron.vertices()[i])
 		IndexToPointMap[i] = tuple(Vertex)
 		PointToIndexMap[tuple(Vertex)] = i
-		NecessaryVertices.append(Vertex)		
-
-	Barycenter = FindBarycenter(NecessaryVertices)
+		NecessaryVertices.append(Vertex)
 
 	for i in xrange(len(SagePolyhedron.faces(1))):
 		NewFace = Face()
@@ -84,20 +87,27 @@ def FasterWrap(PolyAsPts):
 			NewFace.Vertices.add(PointToIndexMap[tuple(Vertex)])
 		Faces[0].append(NewFace)
 
+	InitialFormTuples = []
+	for Ineq in SagePolyhedron.inequalities_list():
+		InitialFormTuples.append((Ineq[1:],FindInitialForm(NecessaryVertices, Ineq[1:])))
+
 	Dim = SagePolyhedron.dim()-1
 	for i in xrange(len(SagePolyhedron.faces(Dim))):
 		NewFace = Face()
-		NewFace.Dimension = Dim
 		Vertices = SagePolyhedron.faces(Dim)[i].vertices()
-		for Vertex in Vertices:
-			NewFace.Vertices.add(PointToIndexMap[tuple(Vertex)])
-		FullDimVertices = Vertices
-		Normal = GetNormalFromHNF(GetHNF(FullDimVertices))
-		NewFace.InnerNormals = [MakeNormalPointInDirectionOfPt(Normal, Barycenter, FullDimVertices[0])]
+		NewFace.Vertices = set([PointToIndexMap[tuple(Vertex)] for Vertex in Vertices])
+
+		FullDimVertices = [list(Vertex) for Vertex in Vertices]
+		FullDimVertices.sort()
+		for Tuple in InitialFormTuples:
+			if Tuple[1] == FullDimVertices:
+				NewFace.InnerNormals.append(Tuple[0])
+				break
 		Faces[1].append(NewFace)
 
 	for i in xrange(len(Faces[0])):
 		Neighbor1 = Faces[0][i]
+		Neighbor1.InnerNormals = copy(Lineality)
 		for j in xrange(len(Faces[0])):
 			if i != j:
 				Neighbor2 = Faces[0][j]
@@ -111,132 +121,10 @@ def FasterWrap(PolyAsPts):
 
 	for i in xrange(len(Faces[0])):
 		Faces[0][i].MyCone = Cone(Faces[0][i].InnerNormals)
-	return Faces, IndexToPointMap, PointToIndexMap, NecessaryVertices
 
-#-------------------------------------------------------------------------------
-def WrapHull(PolyAsPts):
-	"""
-	Wraps Sage's convex hull output to mimic the whole output of the gift
-	wrapping algorithm.
-	"""
-	Faces = []
-	SagePolyhedron = Polyhedron(PolyAsPts)
-	IndexToPointMap = {}
-	PointToIndexMap = {}
-	NecessaryVertices = []
-	for i in xrange(len(SagePolyhedron.vertices())):
-		Vertex = list(SagePolyhedron.vertices()[i])
-		IndexToPointMap[i] = tuple(Vertex)
-		PointToIndexMap[tuple(Vertex)] = i
-		NecessaryVertices.append(Vertex)
-
-	Barycenter = FindBarycenter(NecessaryVertices)
-
-	for i in xrange(1,SagePolyhedron.dim()):
-		Faces.append([])
-		for j in xrange(len(SagePolyhedron.faces(i))):
-			NewFace = Face()
-			NewFace.Dimension = i
-			Vertices = SagePolyhedron.faces(i)[j].vertices()
-			for Vertex in Vertices:
-				NewFace.Vertices.add(PointToIndexMap[tuple(Vertex)])
-			if i == SagePolyhedron.dim() - 1:
-				FullDimVertices = []
-				for Vertex in NewFace.Vertices:
-					FullDimVertices.append(IndexToPointMap[Vertex])
-				Normal = GetNormalFromHNF(GetHNF(FullDimVertices))
-				NewFace.InnerNormals = [MakeNormalPointInDirectionOfPt(Normal, Barycenter, FullDimVertices[0])]
-			Faces[i-1].append(NewFace)
-
-	for i in xrange(0,len(Faces)-1):
-		for j in xrange(len(Faces[i])):
-			ChildFace = Faces[i][j]
-			for k in xrange(len(Faces[i+1])):
-				ParentFace = Faces[i+1][k]
-				if ChildFace.Vertices.issubset(ParentFace.Vertices):
-					ChildFace.Parents.add(k)
-					ParentFace.Children.add(j)
-	
-	for i in xrange(1,len(Faces)):
-		Index = len(Faces) - i
-		for j in xrange(len(Faces[Index])):
-			NewFace = Faces[Index][j]
-			for Child in NewFace.Children:
-				Child = Faces[Index-1][Child] 
-				Child.InnerNormals += NewFace.InnerNormals
-
-
-	for i in xrange(len(Faces[0])):
-		for j in xrange(len(Faces[0])):
-			if i != j:
-				Neighbor1 = Faces[0][i]
-				Neighbor2 = Faces[0][j]
-				if len(Neighbor1.Vertices.intersection(Neighbor2.Vertices)) == 1:
-					Neighbor1.Neighbors.add((j,0))
-					Neighbor2.Neighbors.add((i,0))
-
-	for i in xrange(len(Faces[0])):
-		Faces[0][i].MyCone = Cone(Faces[0][i].InnerNormals)
-
+	print "Lineality space =", Lineality
 	return Faces, IndexToPointMap, PointToIndexMap, NecessaryVertices
 
 #-------------------------------------------------------------------------------
 def ConeContains(P1, P2):
 	return all(P1.contains(Ray) for Ray in P2.rays())
-	
-#-------------------------------------------------------------------------------
-def ParseGf(Output):
-	#Output = ['1 0 1 0', '0 1 0 1']
-	ToReturn = []
-	for Ray in Output:
-		NewRay = []
-		Index = 0
-		for i in xrange(len(Ray)+1):
-			if i == len(Ray) or Ray[i] == ' ':
-				NewRay.append(int(Ray[Index:i]))
-				Index = i
-		ToReturn.append(NewRay)
-	return ToReturn
-
-#-------------------------------------------------------------------------------
-def WrapWithLineality(Pts, R, Polys):
-	Faces, IndexToPointMap, PointToIndexMap, NecessaryVertices = FasterWrap(Pts)	
-	global MyRays
-	global gf
-	try:
-		Pf = R.ideal(Polys).groebner_fan().polyhedralfan()
-		Lineality = ParseGf(Pf.fan_dict['LINEALITY_SPACE'])
-		MyRays = Pf.rays()
-	except:
-		print "Gfan aborted!"
-		MyRays = []
-	for i in xrange(len(MyRays)):
-		MyRays[i] = [-MyRays[i][j] for j in xrange(len(MyRays[i]))]
-	MyRays.sort()
-	print Lineality	
-	gf = R.ideal(Polys).groebner_fan()
-
-	for j in xrange(len(Faces[1])):
-		Faces[1][j].InnerNormals = Faces[1][j].InnerNormals[0]
-
-	for MyCone in MyRays:
-		InitialForm = FindInitialForm(Pts, MyCone)
-		Indices = set([PointToIndexMap[tuple(i)] for i in InitialForm])
-		for Face in Faces[len(Faces)-1]:
-			if Indices == Face.Vertices:
-				Face.InnerNormals = MyCone
-	
-	NegativeLineality = [[-i for i in j] for j in Lineality]
-	for i in xrange(len(Faces[0])):
-		Neighbor1 = Faces[0][i]
-		Neighbor1.InnerNormals = []
-		Neighbor1.InnerNormals = Lineality + NegativeLineality
-		for j in xrange(len(Faces[1])):
-			PossibleParent = Faces[1][j]
-			if Neighbor1.Vertices.issubset(PossibleParent.Vertices):
-				Neighbor1.InnerNormals += [PossibleParent.InnerNormals]
-
-	for i in xrange(len(Faces[0])):
-		Faces[0][i].MyCone = Cone(Faces[0][i].InnerNormals)
-
-	return Faces, IndexToPointMap, PointToIndexMap, NecessaryVertices

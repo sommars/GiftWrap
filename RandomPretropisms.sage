@@ -3,11 +3,13 @@ load("PretropismConfig.sage")
 from time import time
 from multiprocessing import Pool
 import os
-
+from sage.libs.ppl import Variable, Constraint_System, C_Polyhedron
 #-------------------------------------------------------------------------------
 def IntersectConesWrapper(ConeIndex):
+
 	global NumberOfPolytopes
 	global StartIndex
+	global InFinalRound
 	ConeIntersectionCount = 0
 	ConeContainsCount = 0
 	ConeSet = set()
@@ -57,6 +59,22 @@ def IntersectConesWrapper(ConeIndex):
 					NotPretropGraphEdges.add(TestEdge)
 		return SkeletonConeSet, ConeIntersectionCount, ConeContainsCount
 
+	def GetCPolyhedron(OldCone):
+		cs = Constraint_System()
+		BoolList = [True for i in xrange(OldCone.lattice_dim())]
+		OldPolyhedron = OldCone.polyhedron()
+		for Ineq in [i[1:] for i in OldPolyhedron.inequalities_list()]:
+			Expr = 0
+			for i in xrange(len(Ineq)):
+				Expr = Expr + Ineq[i]*Variable(i)
+			cs.insert(Expr >= 0)
+		for Eq in [i[1:] for i in OldPolyhedron.equations_list()]:
+			Expr = 0
+			for i in xrange(len(Eq)):
+				Expr = Expr + Eq[i]*Variable(i)
+			cs.insert(Expr == 0)
+		return C_Polyhedron(cs)
+		
 	def IntersectCones(Index, NewCone):
 		"""
 		Performs the recursion
@@ -81,14 +99,96 @@ def IntersectConesWrapper(ConeIndex):
 		return ConeIntersectionCount, ConeContainsCount
 	MyStart = time()
 	global ConesToFollowList
-	return ConeSet, IntersectCones(StartIndex, ConesToFollowList[ConeIndex]), time() - MyStart
+	Counts = list(IntersectCones(StartIndex, ConesToFollowList[ConeIndex]))
 
+	if StartIndex != NumberOfPolytopes - 1:
+		NewTuples = []
+		for MyCone in list(ConeSet):
+			NewTuples.append((MyCone, GetCPolyhedron(MyCone)))
+		NewCones = set([])
+		ContainCount = 0
+		IndicesToIgnore = set()
+		for j in xrange(len(NewTuples)):
+			TempCone = NewTuples[j]
+			ConsSystem = TempCone[1]
+			ShouldAddCone = True
+			MyDim = TempCone[0].dim()
+			for k in xrange(len(NewTuples)):
+				if j == k or k in IndicesToIgnore:
+					continue
+				TestCone = NewTuples[k]
+				if TestCone[0].dim() < MyDim:
+					continue
+				ContainCount += 1
+				if TestCone[1].contains(ConsSystem):
+					IndicesToIgnore.add(j)
+					ShouldAddCone = False
+					break
+			if ShouldAddCone == True:
+				NewCones.add(TempCone[0])
+			#if ShouldAddCone == False:
+				#NewCones.add(TempCone[0])
+		Counts[1] = Counts[1] + ContainCount
+	else:
+		NewCones = set([])
+		for MyCone in list(ConeSet):
+			NewCones.add(MyCone)
+	return NewCones, Counts, time() - MyStart
+
+#-------------------------------------------------------------------------------
+def CleanContains(ListIndex):
+	global NewTuples
+	global IndexPairList
+	print "ASDF", IndexPairList, ListIndex
+	IndexTuple = IndexPairList[ListIndex]
+	print IndexTuple
+	print NewTuples[IndexTuple[0]]
+	Dim = NewTuples[IndexTuple[0]][0][0].dim()
+	NewCones = []
+	ConeContainsCount = 0
+	IndicesToIgnore = set()
+	for jj in xrange(len(NewTuples[IndexTuple[0]])):
+		TempCone = NewTuples[IndexTuple[0]][jj]
+		ConsSystem = TempCone[1]
+		ShouldAddCone = True
+		MyDim = TempCone[0].dim()
+		for kk in xrange(len(NewTuples[IndexTuple[1]])):
+			if (jj == kk and IndexTuple[0] == IndexTuple[1]) or kk in IndicesToIgnore:
+				continue
+			TestCone = NewTuples[IndexTuple[1]][kk]
+			ConeContainsCount += 1
+			if TestCone[1].contains(ConsSystem):
+				IndicesToIgnore.add(jj)
+				ShouldAddCone = False
+				break
+		if ShouldAddCone == True:
+			NewCones.append(TempCone)
+
+	print "DD"
+	return NewCones, ConeContainsCount, Dim
+	
 #-------------------------------------------------------------------------------
 def DoNewAlgorithm(HullInfoMaps, ThreadCount):
 	"""
 	This is the implementation of our new algorithm to compute pretropisms.
 	"""
-	
+	def GetCPolyhedron(OldCone):
+		cs = Constraint_System()
+		BoolList = [True for i in xrange(OldCone.lattice_dim())]
+		OldPolyhedron = OldCone.polyhedron()
+		for Ineq in [i[1:] for i in OldPolyhedron.inequalities_list()]:
+			Expr = 0
+			for i in xrange(len(Ineq)):
+				Expr = Expr + Ineq[i]*Variable(i)
+			cs.insert(Expr >= 0)
+		for Eq in [i[1:] for i in OldPolyhedron.equations_list()]:
+			Expr = 0
+			for i in xrange(len(Eq)):
+				Expr = Expr + Eq[i]*Variable(i)
+			cs.insert(Expr == 0)
+		return C_Polyhedron(cs)
+
+	from sage.libs.ppl import Variable, Constraint_System, C_Polyhedron
 	ConeIntersectionCount = 0
 	ConeContainsCount = 0
 	NewAlgStart = time()
@@ -102,8 +202,7 @@ def DoNewAlgorithm(HullInfoMaps, ThreadCount):
 		print i, "out of", NumberOfPolytopes-1
 		StartIndex = i
 		MyPool = Pool(ThreadCount)
-		ResultList = MyPool.map(IntersectConesWrapper, [i for i in xrange(len(ConesToFollowList))])
-		#print ResultList
+		ResultList = MyPool.map(IntersectConesWrapper, [j for j in xrange(len(ConesToFollowList))])
 		MyPool.terminate()
 		
 		ConesToFollowSet = set()
@@ -114,10 +213,57 @@ def DoNewAlgorithm(HullInfoMaps, ThreadCount):
 			ConeContainsCount += Element[1][1]
 			TimeList.append(Element[2])
 		TimeList.sort()
-		#print "List of times", TimeList
 		ConesToFollowList = list(ConesToFollowSet)
 		print len(ConesToFollowList), len(ConesToFollowSet), ConeIntersectionCount, ConeContainsCount, TimeList[0:5], TimeList[len(TimeList)-6:len(TimeList)-1]
+		NewCones = set()
+		if i == NumberOfPolytopes - 1:
+			break
+			
+		MyStartTime = time()
+		global NewTuples
+		global IndexPairList
+		NewTuples = []
+		IndexMap = {}
+		for MyCone in ConesToFollowList:
+			Dim = MyCone.dim()
+			if Dim not in IndexMap:
+				IndexMap[Dim] = len(NewTuples)
+				NewTuples.append([])
+			NewTuples[IndexMap[Dim]].append((MyCone, GetCPolyhedron(MyCone)))
 
+		IndexPairList = [(IndexMap[j],IndexMap[j]) for j in IndexMap.keys()]
+		MyPool = Pool(len(IndexPairList))
+		ResultList = MyPool.map(CleanContains, [j for j in xrange(len(IndexPairList))])
+		MyPool.terminate()
+
+		NewTuples = [[] for i in xrange(len(IndexMap))]
+		for Element in ResultList:
+			Dim = Element[2]
+			NewTuples[IndexMap[Dim]] = Element[0]
+			ConeContainsCount += Element[1]
+		IndexList = IndexMap.keys()
+		IndexList.sort()
+		for j in xrange(len(IndexList)-1):
+			IndexPairList = []
+			for k in xrange(len(IndexList)):
+				IndexPairList.append((IndexMap[IndexList[j]],IndexMap[IndexList[k]]))
+			MyPool = Pool(len(IndexPairList))
+			print len(NewTuples)
+			ResultList = MyPool.map(CleanContains, [j for j in xrange(len(IndexPairList))])
+			MyPool.terminate()
+			print "terminate"
+			NewTuples = [[] for i in xrange(len(IndexMap))]
+			for Element in ResultList:
+				Dim = Element[2]
+				NewTuples[IndexMap[Dim]] = Element[0]
+				ConeContainsCount += Element[1]
+
+		for j in xrange(len(NewTuples)):
+			for TempCone in NewTuples[j]:
+				NewCones.add(TempCone[0])
+		ConeSet = NewCones
+		print "JEFF", len(NewCones), len(ConesToFollowList), time() - MyStartTime
+		ConesToFollowList = list(NewCones)
 	ConesToFollowList.sort()
 	TimeList.sort()
 	#print "List of times", TimeList

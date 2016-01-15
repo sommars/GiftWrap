@@ -64,6 +64,23 @@ def FasterWrap(PolyAsPts):
 	Wraps Sage's convex hull output to find only the edge skeleton where each 
 	edge knows its neighbors and knows its cone.
 	"""
+
+	def GetCPolyhedron(OldCone):
+		cs = Constraint_System()
+		BoolList = [True for i in xrange(OldCone.lattice_dim())]
+		OldPolyhedron = OldCone.polyhedron()
+		for Ineq in [i[1:] for i in OldPolyhedron.inequalities_list()]:
+			Expr = 0
+			for i in xrange(len(Ineq)):
+				Expr = Expr + Ineq[i]*Variable(i)
+			cs.insert(Expr >= 0)
+		for Eq in [i[1:] for i in OldPolyhedron.equations_list()]:
+			Expr = 0
+			for i in xrange(len(Eq)):
+				Expr = Expr + Eq[i]*Variable(i)
+			cs.insert(Expr == 0)
+		return C_Polyhedron(cs)
+
 	Faces = [[],[]]
 	SagePolyhedron = Polyhedron(PolyAsPts)
 	PositiveLineality = SagePolyhedron.equations_list()
@@ -121,10 +138,7 @@ def FasterWrap(PolyAsPts):
 
 	for i in xrange(len(Faces[0])):
 		Faces[0][i].MyCone = Cone(Faces[0][i].InnerNormals)
+		Faces[0][i].CPolyhedron = GetCPolyhedron(Faces[0][i].MyCone)
 
 	print "Lineality space =", Lineality
 	return Faces, IndexToPointMap, PointToIndexMap, NecessaryVertices
-
-#-------------------------------------------------------------------------------
-def ConeContains(P1, P2):
-	return all(P1.contains(Ray) for Ray in P2.rays())

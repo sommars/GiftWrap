@@ -7,6 +7,7 @@ class Face:
 		self.Children = set()
 		self.Parents = set()
 		self.MyCone = 0
+		self.CPolyhedron = 0
 	def PrintProps(self):
 		print ""
 		print "Below is a face of dimension " , self.Dimension
@@ -16,5 +17,6 @@ class Face:
 		print "Children = ", self.Children
 		print "Parents = ", self.Parents
 		print "Cone = ", self.MyCone
+		print "CPolyhedron = ", self.CPolyhedron
 		print ""
 		return

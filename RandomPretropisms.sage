@@ -21,12 +21,10 @@ def IntersectConesWrapper(ConeIndex):
 		Faces = HullInfoMap[(PolytopeIndex,"Faces")]
 		PointToIndexMap = HullInfoMap[(PolytopeIndex,"PointToIndexMap")]
 		Pts = HullInfoMap[(PolytopeIndex,"Pts")]
-
 		Normal = [0 for i in xrange(len(NewCone.rays()[0]))]
 		for Ray in NewCone.rays():
 			Normal = [Normal[i] + Ray[i] for i in xrange(len(Normal))]
 		InitialForm = FindInitialForm(Pts, Normal)
-
 		SkeletonConeSet = set([])
 		EdgesToTest = set()
 		InitialIndices = set([PointToIndexMap[tuple(Pt)] for Pt in InitialForm])
@@ -36,10 +34,11 @@ def IntersectConesWrapper(ConeIndex):
 
 		PretropGraphEdges = set()
 		NotPretropGraphEdges = set()
+		NewConeCPolyhedron = GetCPolyhedron(NewCone)
 		while(len(EdgesToTest) > 0):
 			TestEdge = EdgesToTest.pop()
 			Edge = Faces[0][TestEdge]
-			if ConeContains(Edge.MyCone, NewCone):
+			if Edge.CPolyhedron.contains(NewConeCPolyhedron):
 				ConeContainsCount += 1
 				PretropGraphEdges.add(TestEdge)
 				SkeletonConeSet.add(NewCone)

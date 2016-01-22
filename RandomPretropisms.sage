@@ -21,10 +21,12 @@ def IntersectConesWrapper(ConeIndex):
 		Faces = HullInfoMap[(PolytopeIndex,"Faces")]
 		PointToIndexMap = HullInfoMap[(PolytopeIndex,"PointToIndexMap")]
 		Pts = HullInfoMap[(PolytopeIndex,"Pts")]
+
 		Normal = [0 for i in xrange(len(NewCone.rays()[0]))]
 		for Ray in NewCone.rays():
 			Normal = [Normal[i] + Ray[i] for i in xrange(len(Normal))]
 		InitialForm = FindInitialForm(Pts, Normal)
+
 		SkeletonConeSet = set([])
 		EdgesToTest = set()
 		InitialIndices = set([PointToIndexMap[tuple(Pt)] for Pt in InitialForm])
@@ -133,6 +135,39 @@ def IntersectConesWrapper(ConeIndex):
 	return NewCones, Counts, time() - MyStart
 
 #-------------------------------------------------------------------------------
+def DoConeContainment(Index):
+	global NewTuples
+	global ConeConstraintSets
+	global ConstraintList
+	ConstraintTestMap = {}
+	TempCone = NewTuples[Index]
+	TestCPolyhedron = TempCone[1]
+	ShouldAddCone = True
+	MyDim = TempCone[0].dim()
+	for k in xrange(len(NewTuples)):
+		if Index == k:
+			continue
+
+		TestCone = NewTuples[k]
+		if TestCone[0].dim() < MyDim:
+			continue
+		
+		TestConstraintList = list(ConeConstraintSets[k])
+		for ii in xrange(len(TestConstraintList)):
+			BoolValue = TestConstraintList[ii]
+			if not ConstraintTestMap.has_key(BoolValue):
+				if ConstraintList[BoolValue].contains(TestCPolyhedron):
+					ConstraintTestMap[BoolValue] = 1
+				else:
+					ConstraintTestMap[BoolValue] = 0
+			if ConstraintTestMap[BoolValue] != 1:
+				break
+			if ii == len(TestConstraintList) - 1:
+				ShouldAddCone = False
+				return -1
+	return TempCone[0]
+
+#-------------------------------------------------------------------------------
 def DoNewAlgorithm(HullInfoMaps, ThreadCount):
 	"""
 	This is the implementation of our new algorithm to compute pretropisms.
@@ -165,10 +200,11 @@ def DoNewAlgorithm(HullInfoMaps, ThreadCount):
 		print ""
 		print i, "out of", NumberOfPolytopes-1
 		StartIndex = i
+		ParallelStartTime = time()
 		MyPool = Pool(ThreadCount)
 		ResultList = MyPool.map(IntersectConesWrapper, [j for j in xrange(len(ConesToFollowList))])
 		MyPool.terminate()
-		
+		print "ParallelRealTime", time() - ParallelStartTime
 		ConesToFollowSet = set()
 		TimeList = []
 		for Element in ResultList:
@@ -183,33 +219,38 @@ def DoNewAlgorithm(HullInfoMaps, ThreadCount):
 		if i == NumberOfPolytopes - 1:
 			break
 
-		if True == True:
-			NewTuples = []
-			IndicesToIgnore = set()
-			for MyCone in ConesToFollowList:
-				NewTuples.append((MyCone, GetCPolyhedron(MyCone)))
-			MyStartTime = time()
-			for j in xrange(len(NewTuples)):
-				TempCone = NewTuples[j]
-				ConsSystem = TempCone[1]
-				ShouldAddCone = True
-				MyDim = TempCone[0].dim()
-				for k in xrange(len(NewTuples)):
-					if j == k or k in IndicesToIgnore:
-						continue
-					TestCone = NewTuples[k]
-					if TestCone[0].dim() < MyDim:
-						continue
-					ConeContainsCount += 1
-					if TestCone[1].contains(ConsSystem):
-						IndicesToIgnore.add(j)
-						ShouldAddCone = False
-						break
-				if ShouldAddCone == True:
-					NewCones.add(TempCone[0])
+		global NewTuples
+		NewTuples = []
+		ConstraintMap = {}
+		global ConstraintList
+		ConstraintList = []
+		ConstraintCount = 0
+		global ConeConstraintSets
+		ConeConstraintSets = []
+		for MyCone in ConesToFollowList:
+			NewCPolyhedron = GetCPolyhedron(MyCone)
+			NewTuples.append((MyCone, NewCPolyhedron))
+			NewSet = set()
+			for Cons in NewCPolyhedron.constraints():
+				ConsStr = str(Cons)
+				if not ConstraintMap.has_key(ConsStr):
+					ConstraintMap[ConsStr] = ConstraintCount
+					ConstraintList.append(C_Polyhedron(Constraint_System(Cons)))
+					ConstraintCount += 1
+				NewSet.add(ConstraintMap[ConsStr])
+			ConeConstraintSets.append(NewSet)
+		print "Number of constraints", len(ConstraintMap)
+		print "Upper bound on number of tests", len(ConstraintMap)*len(ConesToFollowList)
+		MyStartTime = time()
+		MyPool = Pool(ThreadCount)
+		ResultList = MyPool.map(DoConeContainment, [j for j in xrange(len(ConesToFollowList))])
+		MyPool.terminate()
+		for NewCone in ResultList:
+			if NewCone != -1:
+				NewCones.add(NewCone)
 
-			print "JEFF", len(NewCones), len(ConesToFollowList), time() - MyStartTime
-			ConesToFollowList = list(NewCones)
+		print "CONTAINMENT END", len(NewCones), len(ConesToFollowList), time() - MyStartTime
+		ConesToFollowList = list(NewCones)
 
 	ConesToFollowList.sort()
 	print "NEW RESULT", ConesToFollowList

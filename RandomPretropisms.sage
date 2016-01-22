@@ -62,7 +62,6 @@ def IntersectConesWrapper(ConeIndex):
 
 	def GetCPolyhedron(OldCone):
 		cs = Constraint_System()
-		BoolList = [True for i in xrange(OldCone.lattice_dim())]
 		OldPolyhedron = OldCone.polyhedron()
 		for Ineq in [i[1:] for i in OldPolyhedron.inequalities_list()]:
 			Expr = 0
@@ -102,6 +101,7 @@ def IntersectConesWrapper(ConeIndex):
 	global ConesToFollowList
 	Counts = list(IntersectCones(StartIndex, ConesToFollowList[ConeIndex]))
 
+	ConeDict = {}
 	if StartIndex != NumberOfPolytopes - 1:
 		NewTuples = []
 		for MyCone in list(ConeSet):
@@ -127,12 +127,13 @@ def IntersectConesWrapper(ConeIndex):
 					break
 			if ShouldAddCone == True:
 				NewCones.add(TempCone[0])
+				ConeDict[TempCone[0]] = TempCone[1]
 		Counts[1] = Counts[1] + ContainCount
 	else:
 		NewCones = set([])
 		for MyCone in list(ConeSet):
 			NewCones.add(MyCone)
-	return NewCones, Counts, time() - MyStart
+	return NewCones, Counts, time() - MyStart, ConeDict
 
 #-------------------------------------------------------------------------------
 def DoConeContainment(Index):
@@ -172,22 +173,6 @@ def DoNewAlgorithm(HullInfoMaps, ThreadCount):
 	"""
 	This is the implementation of our new algorithm to compute pretropisms.
 	"""
-	def GetCPolyhedron(OldCone):
-		cs = Constraint_System()
-		BoolList = [True for i in xrange(OldCone.lattice_dim())]
-		OldPolyhedron = OldCone.polyhedron()
-		for Ineq in [i[1:] for i in OldPolyhedron.inequalities_list()]:
-			Expr = 0
-			for i in xrange(len(Ineq)):
-				Expr = Expr + Ineq[i]*Variable(i)
-			cs.insert(Expr >= 0)
-		for Eq in [i[1:] for i in OldPolyhedron.equations_list()]:
-			Expr = 0
-			for i in xrange(len(Eq)):
-				Expr = Expr + Eq[i]*Variable(i)
-			cs.insert(Expr == 0)
-		return C_Polyhedron(cs)
-
 	ConeIntersectionCount = 0
 	ConeContainsCount = 0
 	NewAlgStart = time()
@@ -205,16 +190,20 @@ def DoNewAlgorithm(HullInfoMaps, ThreadCount):
 		ResultList = MyPool.map(IntersectConesWrapper, [j for j in xrange(len(ConesToFollowList))])
 		MyPool.terminate()
 		print "ParallelRealTime", time() - ParallelStartTime
+		ParallelCleanUpTime = time()
 		ConesToFollowSet = set()
 		TimeList = []
+		ConeDict = {}
 		for Element in ResultList:
 			ConesToFollowSet = ConesToFollowSet.union(Element[0])
 			ConeIntersectionCount += Element[1][0]
 			ConeContainsCount += Element[1][1]
 			TimeList.append(Element[2])
+			ConeDict = dict(ConeDict, **Element[3])
 		TimeList.sort()
 		ConesToFollowList = list(ConesToFollowSet)
 		print len(ConesToFollowList), len(ConesToFollowSet), ConeIntersectionCount, ConeContainsCount, TimeList[0:5], TimeList[len(TimeList)-6:len(TimeList)-1]
+		print "ParallelCleanupTime", time() - ParallelCleanUpTime
 		NewCones = set()
 		if i == NumberOfPolytopes - 1:
 			break
@@ -227,10 +216,16 @@ def DoNewAlgorithm(HullInfoMaps, ThreadCount):
 		ConstraintCount = 0
 		global ConeConstraintSets
 		ConeConstraintSets = []
+		NewTime = time()
+		CPolyTime = 0
+		ConstrTime = 0
 		for MyCone in ConesToFollowList:
-			NewCPolyhedron = GetCPolyhedron(MyCone)
+			TestTime = time()
+			NewCPolyhedron = ConeDict[MyCone]
+			CPolyTime += time() - TestTime
 			NewTuples.append((MyCone, NewCPolyhedron))
 			NewSet = set()
+			ConstrTimeTime = time()
 			for Cons in NewCPolyhedron.constraints():
 				ConsStr = str(Cons)
 				if not ConstraintMap.has_key(ConsStr):
@@ -239,8 +234,12 @@ def DoNewAlgorithm(HullInfoMaps, ThreadCount):
 					ConstraintCount += 1
 				NewSet.add(ConstraintMap[ConsStr])
 			ConeConstraintSets.append(NewSet)
+			ConstrTime += time() - ConstrTimeTime
+		print "ConstraintTime", ConstrTime
+		print "CPolyTime", CPolyTime
 		print "Number of constraints", len(ConstraintMap)
 		print "Upper bound on number of tests", len(ConstraintMap)*len(ConesToFollowList)
+		print "Cone contain setup time", time() - NewTime
 		MyStartTime = time()
 		MyPool = Pool(ThreadCount)
 		ResultList = MyPool.map(DoConeContainment, [j for j in xrange(len(ConesToFollowList))])

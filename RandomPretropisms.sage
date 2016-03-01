@@ -6,24 +6,24 @@ import os
 from sage.libs.ppl import Variable, Constraint_System, C_Polyhedron
 #-------------------------------------------------------------------------------
 def IntersectConesWrapper(ConeIndex):
-
 	global NumberOfPolytopes
 	global StartIndex
-	global InFinalRound
 	ConeIntersectionCount = 0
 	ConeContainsCount = 0
 	ConeSet = set()
-	def TraverseEdgeSkeleton(PolytopeIndex, NewCone, ConeIntersectionCount, ConeContainsCount):
+	def TraverseEdgeSkeleton(PolytopeIndex, InputReducedCone):
 		"""
 		Explores the edge skeleton and returns a list of cones that are the
 		intersection of NewCone with every edge in the pretropism graph.
 		"""
+		ConeIntersectionCount = 0
+		ConeContainsCount = 0
 		Faces = HullInfoMap[(PolytopeIndex,"Faces")]
 		PointToIndexMap = HullInfoMap[(PolytopeIndex,"PointToIndexMap")]
 		Pts = HullInfoMap[(PolytopeIndex,"Pts")]
 
-		Normal = [0 for i in xrange(len(NewCone.rays()[0]))]
-		for Ray in NewCone.rays():
+		Normal = [0 for i in xrange(len(InputReducedCone.MyCone.rays()[0]))]
+		for Ray in InputReducedCone.MyCone.rays():
 			Normal = [Normal[i] + Ray[i] for i in xrange(len(Normal))]
 		InitialForm = FindInitialForm(Pts, Normal)
 
@@ -33,31 +33,37 @@ def IntersectConesWrapper(ConeIndex):
 		for i in xrange(len(Faces[0])):
 			if len(InitialIndices.intersection(Faces[0][i].Vertices)) != 0:
 				EdgesToTest.add(i)
-
 		PretropGraphEdges = set()
 		NotPretropGraphEdges = set()
-		NewConeCPolyhedron = GetCPolyhedron(NewCone)
+
+		if not InputReducedCone.Has_CPolyhedron:
+			InputReducedCone.CPolyhedron = GetCPolyhedron(InputReducedCone.MyCone)
+			InputReducedCone.Has_CPolyhedron = True
+		#Here's where the dimension reduction stuff will need to happen.
 		while(len(EdgesToTest) > 0):
-			TestEdge = EdgesToTest.pop()
-			Edge = Faces[0][TestEdge]
-			if Edge.CPolyhedron.contains(NewConeCPolyhedron):
+			TestEdgeIndex = EdgesToTest.pop()
+			Edge = Faces[0][TestEdgeIndex]
+			if Edge.CPolyhedron.contains(InputReducedCone.CPolyhedron):
 				ConeContainsCount += 1
-				PretropGraphEdges.add(TestEdge)
-				SkeletonConeSet.add(NewCone)
+				PretropGraphEdges.add(TestEdgeIndex)
+				SkeletonConeSet.add(InputReducedCone)
 				for Neighbor in Edge.Neighbors:
 					if Neighbor[0] not in PretropGraphEdges and Neighbor[0] not in NotPretropGraphEdges:
 						EdgesToTest.add(Neighbor[0])
 			else:
-				TempCone = (Edge.MyCone).intersection(NewCone)
+				TempCone = (Edge.MyCone).intersection(InputReducedCone.MyCone)
 				ConeIntersectionCount += 1
 				if len(TempCone.rays()) > 0:
-					PretropGraphEdges.add(TestEdge)
-					SkeletonConeSet.add(TempCone)
+					PretropGraphEdges.add(TestEdgeIndex)
+					NewReducedCone = ReducedConeClass()
+					NewReducedCone.MyCone = TempCone
+					NewReducedCone.EdgeTuples = InputReducedCone.EdgeTuples + [[PolytopeIndex, TestEdgeIndex]]
+					SkeletonConeSet.add(NewReducedCone)
 					for Neighbor in Edge.Neighbors:
 						if Neighbor[0] not in PretropGraphEdges and Neighbor[0] not in NotPretropGraphEdges:
 							EdgesToTest.add(Neighbor[0])
 				else:
-					NotPretropGraphEdges.add(TestEdge)
+					NotPretropGraphEdges.add(TestEdgeIndex)
 		return SkeletonConeSet, ConeIntersectionCount, ConeContainsCount
 
 	def GetCPolyhedron(OldCone):
@@ -75,82 +81,67 @@ def IntersectConesWrapper(ConeIndex):
 			cs.insert(Expr == 0)
 		return C_Polyhedron(cs)
 
-	def IntersectCones(Index, NewCone):
-		"""
-		Performs the recursion
-		"""
-		if (Index != NumberOfPolytopes) and (Index == StartIndex + 1):
-			if len(NewCone.rays()) > 0:
-				ConeSet.add(NewCone)
-			return 0, 0
-		elif Index == NumberOfPolytopes:
-			if len(NewCone.rays()) > 0:
-				for Ray in NewCone.rays():
-					ConeSet.add(tuple(Ray.list()))
-			return 0, 0
-		else:
-			SkeletonConeSet, NewConeIntersectionCount, NewConeContainsCount = TraverseEdgeSkeleton(Index, NewCone, 0, 0)
-			ConeIntersectionCount = NewConeIntersectionCount
-			ConeContainsCount = NewConeContainsCount
-			for TempCone in SkeletonConeSet:
-				NewConeIntersectionCount, NewConeContainsCount = IntersectCones(Index + 1, TempCone)
-				ConeIntersectionCount += NewConeIntersectionCount
-				ConeContainsCount += NewConeContainsCount
-		return ConeIntersectionCount, ConeContainsCount
 	MyStart = time()
 	global ConesToFollowList
-	Counts = list(IntersectCones(StartIndex, ConesToFollowList[ConeIndex]))
-
-	ConeDict = {}
+	SkeletonReducedConeSet, ConeIntersectionCount, ConeContainsCount = TraverseEdgeSkeleton(StartIndex, ConesToFollowList[ConeIndex])
+	Counts = [ConeIntersectionCount, ConeContainsCount]
 	if StartIndex != NumberOfPolytopes - 1:
-		NewTuples = []
-		for MyCone in list(ConeSet):
-			NewTuples.append((MyCone, GetCPolyhedron(MyCone)))
+		ConeSet = SkeletonReducedConeSet
+	else:
+		for ReducedCone in SkeletonReducedConeSet:
+			for Ray in ReducedCone.MyCone.rays():
+				ConeSet.add(tuple(Ray.list()))
+
+	ConeList = list(ConeSet)
+	if StartIndex != NumberOfPolytopes - 1:
+		for ReducedCone in ConeList:
+			if not ReducedCone.Has_CPolyhedron:
+				ReducedCone.CPolyhedron = GetCPolyhedron(ReducedCone.MyCone)
+				ReducedCone.Has_CPolyhedron = True
 		NewCones = set([])
 		ContainCount = 0
 		IndicesToIgnore = set()
-		for j in xrange(len(NewTuples)):
-			TempCone = NewTuples[j]
-			ConsSystem = TempCone[1]
+		for j in xrange(len(ConeList)):
+			ReducedCone = ConeList[j]
 			ShouldAddCone = True
-			MyDim = TempCone[0].dim()
-			for k in xrange(len(NewTuples)):
+			MyDim = ReducedCone.MyCone.dim()
+			for k in xrange(len(ConeList)):
+				ReducedCone2 = ConeList[k]
 				if j == k or k in IndicesToIgnore:
 					continue
-				TestCone = NewTuples[k]
-				if TestCone[0].dim() < MyDim:
+				if ReducedCone2.MyCone.dim() < MyDim:
 					continue
 				ContainCount += 1
-				if TestCone[1].contains(ConsSystem):
+				if ReducedCone2.CPolyhedron.contains(ReducedCone.CPolyhedron):
 					IndicesToIgnore.add(j)
 					ShouldAddCone = False
 					break
+
 			if ShouldAddCone == True:
-				NewCones.add(TempCone[0])
-				ConeDict[TempCone[0]] = TempCone[1]
+				NewCones.add(ReducedCone)
 		Counts[1] = Counts[1] + ContainCount
 	else:
 		NewCones = set([])
-		for MyCone in list(ConeSet):
+		for MyCone in ConeList:
 			NewCones.add(MyCone)
-	return NewCones, Counts, time() - MyStart, ConeDict
+	return NewCones, Counts, time() - MyStart
 
 #-------------------------------------------------------------------------------
 def DoConeContainment(Index):
-	global NewTuples
+	global ConesToFollowList
 	global ConeConstraintSets
 	global ConstraintList
 	ConstraintTestMap = {}
-	TempCone = NewTuples[Index]
-	TestCPolyhedron = TempCone[1]
+	ReducedCone = ConesToFollowList[Index]
+	TestCPolyhedron = ReducedCone.CPolyhedron
 	ShouldAddCone = True
-	MyDim = TempCone[0].dim()
-	for k in xrange(len(NewTuples)):
+	MyDim = ReducedCone.MyCone.dim()
+	for k in xrange(len(ConesToFollowList)):
 		if Index == k:
 			continue
 
-		TestCone = NewTuples[k]
-		if TestCone[0].dim() < MyDim:
+		TestCone = ConesToFollowList[k]
+		if TestCone.MyCone.dim() < MyDim:
 			continue
 		
 		TestConstraintList = list(ConeConstraintSets[k])
@@ -166,7 +157,7 @@ def DoConeContainment(Index):
 			if ii == len(TestConstraintList) - 1:
 				ShouldAddCone = False
 				return -1
-	return TempCone[0]
+	return ReducedCone
 
 #-------------------------------------------------------------------------------
 def DoNewAlgorithm(HullInfoMaps, ThreadCount):
@@ -180,8 +171,14 @@ def DoNewAlgorithm(HullInfoMaps, ThreadCount):
 	global StartIndex
 	global NumberOfPolytopes
 	global ConesToFollowList
-	ConesToFollowList = [Edge.MyCone for Edge in HullInfoMap[(0,"Faces")][0]]
-	for i in xrange(1,NumberOfPolytopes):
+	ConesToFollowList = []
+	for i in xrange(len(HullInfoMap[(0,"Faces")][0])):
+		NewReducedCone = ReducedConeClass()
+		NewReducedCone.EdgeTuples.append((0,i))
+		NewReducedCone.MyCone = HullInfoMap[(0,"Faces")][0][i].MyCone
+		ConesToFollowList.append(NewReducedCone)
+
+	for i in xrange(1, NumberOfPolytopes):
 		print ""
 		print i, "out of", NumberOfPolytopes-1
 		StartIndex = i
@@ -199,7 +196,6 @@ def DoNewAlgorithm(HullInfoMaps, ThreadCount):
 			ConeIntersectionCount += Element[1][0]
 			ConeContainsCount += Element[1][1]
 			TimeList.append(Element[2])
-			ConeDict = dict(ConeDict, **Element[3])
 		TimeList.sort()
 		ConesToFollowList = list(ConesToFollowSet)
 		print len(ConesToFollowList), len(ConesToFollowSet), ConeIntersectionCount, ConeContainsCount, TimeList[0:5], TimeList[len(TimeList)-6:len(TimeList)-1]
@@ -208,8 +204,6 @@ def DoNewAlgorithm(HullInfoMaps, ThreadCount):
 		if i == NumberOfPolytopes - 1:
 			break
 
-		global NewTuples
-		NewTuples = []
 		ConstraintMap = {}
 		global ConstraintList
 		ConstraintList = []
@@ -219,11 +213,10 @@ def DoNewAlgorithm(HullInfoMaps, ThreadCount):
 		NewTime = time()
 		CPolyTime = 0
 		ConstrTime = 0
-		for MyCone in ConesToFollowList:
+		for ReducedCone in ConesToFollowList:
 			TestTime = time()
-			NewCPolyhedron = ConeDict[MyCone]
+			NewCPolyhedron = ReducedCone.CPolyhedron
 			CPolyTime += time() - TestTime
-			NewTuples.append((MyCone, NewCPolyhedron))
 			NewSet = set()
 			ConstrTimeTime = time()
 			for Cons in NewCPolyhedron.constraints():

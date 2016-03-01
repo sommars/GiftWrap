@@ -8,7 +8,6 @@ def DoReducedCyclicTest(nvars, ThreadCount = 1):
 	"""
 	
 	Polys, R = ReducedCyclicNRoots(nvars)
-	#Polys, R = RandomlyLiftedReducedCyclicNRoots(nvars)
 	print Polys
 	#Manually reordering the polynomials by size of lineality space
 	if nvars == 5:
@@ -44,9 +43,8 @@ def DoReducedCyclicTest(nvars, ThreadCount = 1):
 	HullTime = time() - HullTime
 	print "ConvexHullTime", HullTime
 	TimeList = [HullTime]
-	TimeList.append(DoGfanFromSage(Polys, R))
+	#TimeList.append(DoGfanFromSage(Polys, R))
 	TimeList.append(DoNewAlgorithm(HullInfoMap, ThreadCount))
-	#TimeList.append(DoNewAlgorithmTwo(HullInfoMap,[i for i in xrange(len(PolysAsPts))]))
 	print TimeList
 	return TimeList
 

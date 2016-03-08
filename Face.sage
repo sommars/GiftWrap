@@ -8,6 +8,8 @@ class Face:
 		self.Parents = set()
 		self.MyCone = 0
 		self.CPolyhedron = 0
+		self.Equations = 0
+		self.Inequalities = 0
 	def PrintProps(self):
 		print ""
 		print "Below is a face of dimension " , self.Dimension
@@ -25,8 +27,10 @@ class Face:
 class ReducedConeClass:
 	def __init__(self):
 		self.MyCone = Cone([[0]])
+		self.ReducedCone = Cone([[0]])
 		self.EdgeTuples = []
-		self.Reductions = 0
+		self.Reductions = []
+		self.DimensionsRemoved = []
 		self.CPolyhedron = 0
 		self.Has_CPolyhedron = False
 	def __repr__(self):
@@ -34,7 +38,9 @@ class ReducedConeClass:
 		for ray in self.MyCone.rays():
 			L.append(ray)
 		L.sort()
-		return str(L)
+		LL = self.DimensionsRemoved
+		LL.sort()
+		return str(L) + str(LL)
 	def __hash__(self):
 		return hash(self.__repr__())
 	def __eq__(self, other):

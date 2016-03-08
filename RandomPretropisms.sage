@@ -10,7 +10,6 @@ def IntersectConesWrapper(ConeIndex):
 	global StartIndex
 	ConeIntersectionCount = 0
 	ConeContainsCount = 0
-	ConeSet = set()
 	def TraverseEdgeSkeleton(PolytopeIndex, InputReducedCone):
 		"""
 		Explores the edge skeleton and returns a list of cones that are the
@@ -35,11 +34,10 @@ def IntersectConesWrapper(ConeIndex):
 				EdgesToTest.add(i)
 		PretropGraphEdges = set()
 		NotPretropGraphEdges = set()
-
 		if not InputReducedCone.Has_CPolyhedron:
 			InputReducedCone.CPolyhedron = GetCPolyhedron(InputReducedCone.MyCone)
 			InputReducedCone.Has_CPolyhedron = True
-		#Here's where the dimension reduction stuff will need to happen.
+
 		while(len(EdgesToTest) > 0):
 			TestEdgeIndex = EdgesToTest.pop()
 			Edge = Faces[0][TestEdgeIndex]
@@ -51,13 +49,49 @@ def IntersectConesWrapper(ConeIndex):
 					if Neighbor[0] not in PretropGraphEdges and Neighbor[0] not in NotPretropGraphEdges:
 						EdgesToTest.add(Neighbor[0])
 			else:
-				TempCone = (Edge.MyCone).intersection(InputReducedCone.MyCone)
+				#Here's where the dimension reduction stuff will need to happen.
+				global TempEquations
+				TempEquations = deepcopy(Edge.Equations)
+				global TempInequalities
+				TempInequalities = deepcopy(Edge.Inequalities)
+				for Reduction in InputReducedCone.Reductions:
+					for j in xrange(len(TempEquations)):
+						TempEquations[j] = DropDim(Reduction[1],TempEquations[j],Reduction[0])
+					for j in xrange(len(TempInequalities)):
+						TempInequalities[j] = DropDim(Reduction[1],TempInequalities[j],Reduction[0])
+				Poly = Polyhedron(eqns=TempEquations,ieqs=TempInequalities)
+				if len(Poly.rays_list()) + len(Poly.lines_list()) == 0:
+					NotPretropGraphEdges.add(TestEdgeIndex)
+					continue
+				TempReducedCone = Cone(Poly.rays_list() + Poly.lines_list() + [[-Coord for Coord in TempLine ] for TempLine in Poly.lines_list()])
+				TempCone = TempReducedCone.intersection(InputReducedCone.ReducedCone)
 				ConeIntersectionCount += 1
 				if len(TempCone.rays()) > 0:
 					PretropGraphEdges.add(TestEdgeIndex)
 					NewReducedCone = ReducedConeClass()
-					NewReducedCone.MyCone = TempCone
-					NewReducedCone.EdgeTuples = InputReducedCone.EdgeTuples + [[PolytopeIndex, TestEdgeIndex]]
+					NewReducedCone.EdgeTuples = InputReducedCone.EdgeTuples + [(PolytopeIndex, TestEdgeIndex)]
+					NewReducedCone.MyCone = (Edge.MyCone).intersection(InputReducedCone.MyCone)
+					if NewReducedCone.MyCone.dim() != TempCone.dim():
+						print "This is bad"
+						print avariablethatdoesntexist
+					NewReducedCone.Reductions = deepcopy(InputReducedCone.Reductions)
+					#Now we need to check if the new cone is reducible
+					if TempCone.lattice_dim() == TempCone.dim():
+						NewReducedCone.ReducedCone = TempCone
+					else:
+						TempPolyhedron = TempCone.polyhedron()
+						TempEquations = TempPolyhedron.equations_list()
+						TempInequalities = TempPolyhedron.inequalities_list()
+						for j in xrange(len(TempEquations)):
+							Equation = TempEquations[j]
+							Index = next((i for i, x in enumerate(Equation) if x), None)
+							NewReducedCone.Reductions.append([Index, TempEquations[j]])
+							for k in xrange(j+1, len(TempEquations)):
+								TempEquations[k] = DropDim(Equation,TempEquations[k],Index)
+							for k in xrange(len(TempInequalities)):
+								TempInequalities[k] = DropDim(Equation,TempInequalities[k],Index)
+						TempPolyhedron = Polyhedron(ieqs=TempInequalities)
+						NewReducedCone.ReducedCone = Cone(TempPolyhedron.rays_list() + TempPolyhedron.lines_list() + [[-Coord for Coord in TempLine ] for TempLine in TempPolyhedron.lines_list()])
 					SkeletonConeSet.add(NewReducedCone)
 					for Neighbor in Edge.Neighbors:
 						if Neighbor[0] not in PretropGraphEdges and Neighbor[0] not in NotPretropGraphEdges:
@@ -81,49 +115,52 @@ def IntersectConesWrapper(ConeIndex):
 			cs.insert(Expr == 0)
 		return C_Polyhedron(cs)
 
+	def DropDim(A,B,Index):
+		if B[Index] == 0:
+			del B[Index]
+			return B
+		AMult = lcm(A[Index],B[Index])/abs(A[Index])*sign(B[Index])
+		BMult = lcm(A[Index],B[Index])/abs(B[Index])*sign(A[Index])
+		NewB = []
+		for i in xrange(len(B)):
+			if i == Index:
+				continue
+			NewB.append(-AMult*A[i]+BMult*B[i])
+		return NewB
+
 	MyStart = time()
 	global ConesToFollowList
+	InputReducedCone = ConesToFollowList[ConeIndex]
 	SkeletonReducedConeSet, ConeIntersectionCount, ConeContainsCount = TraverseEdgeSkeleton(StartIndex, ConesToFollowList[ConeIndex])
 	Counts = [ConeIntersectionCount, ConeContainsCount]
-	if StartIndex != NumberOfPolytopes - 1:
-		ConeSet = SkeletonReducedConeSet
-	else:
-		for ReducedCone in SkeletonReducedConeSet:
-			for Ray in ReducedCone.MyCone.rays():
-				ConeSet.add(tuple(Ray.list()))
 
-	ConeList = list(ConeSet)
-	if StartIndex != NumberOfPolytopes - 1:
-		for ReducedCone in ConeList:
-			if not ReducedCone.Has_CPolyhedron:
-				ReducedCone.CPolyhedron = GetCPolyhedron(ReducedCone.MyCone)
-				ReducedCone.Has_CPolyhedron = True
-		NewCones = set([])
-		ContainCount = 0
-		IndicesToIgnore = set()
-		for j in xrange(len(ConeList)):
-			ReducedCone = ConeList[j]
-			ShouldAddCone = True
-			MyDim = ReducedCone.MyCone.dim()
-			for k in xrange(len(ConeList)):
-				ReducedCone2 = ConeList[k]
-				if j == k or k in IndicesToIgnore:
-					continue
-				if ReducedCone2.MyCone.dim() < MyDim:
-					continue
-				ContainCount += 1
-				if ReducedCone2.CPolyhedron.contains(ReducedCone.CPolyhedron):
-					IndicesToIgnore.add(j)
-					ShouldAddCone = False
-					break
+	ConeList = list(SkeletonReducedConeSet)
+	for ReducedCone in ConeList:
+		if not ReducedCone.Has_CPolyhedron:
+			ReducedCone.CPolyhedron = GetCPolyhedron(ReducedCone.MyCone)
+			ReducedCone.Has_CPolyhedron = True
+	NewCones = set([])
+	ContainCount = 0
+	IndicesToIgnore = set()
+	for j in xrange(len(ConeList)):
+		ReducedCone = ConeList[j]
+		ShouldAddCone = True
+		MyDim = ReducedCone.MyCone.dim()
+		for k in xrange(len(ConeList)):
+			ReducedCone2 = ConeList[k]
+			if j == k or k in IndicesToIgnore:
+				continue
+			if ReducedCone2.MyCone.dim() < MyDim:
+				continue
+			ContainCount += 1
+			if ReducedCone2.CPolyhedron.contains(ReducedCone.CPolyhedron):
+				IndicesToIgnore.add(j)
+				ShouldAddCone = False
+				break
 
-			if ShouldAddCone == True:
-				NewCones.add(ReducedCone)
-		Counts[1] = Counts[1] + ContainCount
-	else:
-		NewCones = set([])
-		for MyCone in ConeList:
-			NewCones.add(MyCone)
+		if ShouldAddCone == True:
+			NewCones.add(ReducedCone)
+	Counts[1] = Counts[1] + ContainCount
 	return NewCones, Counts, time() - MyStart
 
 #-------------------------------------------------------------------------------
@@ -164,6 +201,20 @@ def DoNewAlgorithm(HullInfoMaps, ThreadCount):
 	"""
 	This is the implementation of our new algorithm to compute pretropisms.
 	"""
+
+	def DropDim(A,B,Index):
+		if B[Index] == 0:
+			del B[Index]
+			return B
+		AMult = lcm(A[Index],B[Index])/abs(A[Index])*sign(B[Index])
+		BMult = lcm(A[Index],B[Index])/abs(B[Index])*sign(A[Index])
+		NewB = []
+		for i in xrange(len(B)):
+			if i == Index:
+				continue
+			NewB.append(-AMult*A[i]+BMult*B[i])
+		return NewB
+
 	ConeIntersectionCount = 0
 	ConeContainsCount = 0
 	NewAlgStart = time()
@@ -173,10 +224,41 @@ def DoNewAlgorithm(HullInfoMaps, ThreadCount):
 	global ConesToFollowList
 	ConesToFollowList = []
 	for i in xrange(len(HullInfoMap[(0,"Faces")][0])):
+		NewFace = HullInfoMap[(0,"Faces")][0][i]
 		NewReducedCone = ReducedConeClass()
 		NewReducedCone.EdgeTuples.append((0,i))
-		NewReducedCone.MyCone = HullInfoMap[(0,"Faces")][0][i].MyCone
+		NewReducedCone.MyCone = NewFace.MyCone
+		TempEquations = deepcopy(NewFace.Equations)
+		TempInequalities = deepcopy(NewFace.Inequalities)
+		for j in xrange(len(TempEquations)):
+			Equation = TempEquations[j]
+			Index = next((i for i, x in enumerate(Equation) if x), None)
+			#add the new equation and the relevant index to the Reductions
+			NewReducedCone.Reductions.append([Index, TempEquations[j]])
+			#reduce all of the equations in TempEquations
+			for k in xrange(j+1, len(TempEquations)):
+				TempEquations[k] = DropDim(Equation,TempEquations[k],Index)
+			for k in xrange(len(TempInequalities)):
+				TempInequalities[k] = DropDim(Equation,TempInequalities[k],Index)
+
+		TempPolyhedron = Polyhedron(ieqs=TempInequalities)
+		NewReducedCone.ReducedCone = Cone(TempPolyhedron.rays_list() + TempPolyhedron.lines_list() + [[-Coord for Coord in TempLine ] for TempLine in TempPolyhedron.lines_list()])
+		print NewReducedCone.Reductions
+		L = []
+		for TempRay in NewReducedCone.ReducedCone.rays():
+			L.append(list(TempRay))
+		LL = []
+		for TempRay in NewReducedCone.MyCone.rays():
+			LL.append(list(TempRay))
+		for TempReduction in NewReducedCone.Reductions:
+			for TempRay in LL:
+				del TempRay[TempReduction[0]-1]
+		L.sort()
+		LL.sort()
 		ConesToFollowList.append(NewReducedCone)
+		if L != LL:
+			print "This is bad"
+			print avariablethatdoesntexist
 
 	for i in xrange(1, NumberOfPolytopes):
 		print ""
@@ -190,7 +272,6 @@ def DoNewAlgorithm(HullInfoMaps, ThreadCount):
 		ParallelCleanUpTime = time()
 		ConesToFollowSet = set()
 		TimeList = []
-		ConeDict = {}
 		for Element in ResultList:
 			ConesToFollowSet = ConesToFollowSet.union(Element[0])
 			ConeIntersectionCount += Element[1][0]
@@ -243,9 +324,22 @@ def DoNewAlgorithm(HullInfoMaps, ThreadCount):
 
 		print "CONTAINMENT END", len(NewCones), len(ConesToFollowList), time() - MyStartTime
 		ConesToFollowList = list(NewCones)
-
-	ConesToFollowList.sort()
-	print "NEW RESULT", ConesToFollowList
+		
+	print "GENERATING RESULTS..."
+	Result = set([])
+	for ReducedCone in ConesToFollowList:
+		EdgeTuples = ReducedCone.EdgeTuples
+		if len(EdgeTuples) == 0:
+			continue
+		NewCone = HullInfoMap[(EdgeTuples[0][0],"Faces")][0][EdgeTuples[0][1]].MyCone
+		for i in xrange(1, len(EdgeTuples)):
+			NewCone = NewCone.intersection(HullInfoMap[(EdgeTuples[i][0],"Faces")][0][EdgeTuples[i][1]].MyCone)
+		for Ray in NewCone.rays():
+			Result.add(tuple(Ray.list()))
+			
+	Result = list(Result)
+	Result.sort()
+	print "NEW RESULT", Result
 	print "Number of cone intersections = ", ConeIntersectionCount
 	print "Number of cone contains = ", ConeContainsCount
 	return time() - NewAlgStart
